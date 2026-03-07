@@ -1,0 +1,5 @@
+ode_modules
+.env
+state.json
+backtest-dataset.json
+*.log

@@ -6,9 +6,17 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "run": "node signals-telegram-core.js",
-    "loop": "while true; do node signals-telegram-core.js; sleep 60; done",
+    "loop": "while true; do node signals-telegram-core.js; sleep 300; done",
     "analyze": "node analyze-state.js",
-    "simulate": "node simulate-params.js"
+    "simulate": "node simulate-params.js",
+    "optimize": "node optimize-strategy.js",
+    "backfill": "node backfill-dataset.js",
+    "backtest": "node backtest-bot.js",
+    "auto": "node auto-improve.js",
+    "report": "node strategy-report.js",
+    "walk": "node walk-forward-test.js",
+    "multi": "node multi-symbol-backtest.js",
+    "optimize-symbols": "node optimize-per-symbol.js"
   },
   "keywords": [],
   "author": "",

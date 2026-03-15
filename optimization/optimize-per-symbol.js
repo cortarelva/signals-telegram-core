@@ -5,7 +5,8 @@ const SYMBOLS = [
   "ETHUSDC",
   "BNBUSDC",
   "SOLUSDC",
-  "LINKUSDC"
+  "LINKUSDC",
+  "SHIBUSDC",
 ]
 
 const TF = "5m"

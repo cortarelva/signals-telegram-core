@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Signals Bot Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="topbar">
+      <div>
+        <h1>Signals Bot Dashboard</h1>
+        <div id="meta" class="muted">Loading...</div>
+      </div>
+      <div class="topbar-actions">
+        <button id="refreshBtn" class="btn">Refresh</button>
+      </div>
+    </header>
+
+    <section class="card section">
+      <h2>Filtros</h2>
+      <div class="filters">
+        <div class="field">
+          <label for="symbolFilter">Símbolo</label>
+          <select id="symbolFilter"></select>
+        </div>
+        <div class="field">
+          <label for="tfFilter">Timeframe</label>
+          <select id="tfFilter"></select>
+        </div>
+        <div class="field">
+          <label for="classFilter">Classe</label>
+          <select id="classFilter">
+            <option value="ALL">Todas</option>
+            <option value="EXECUTABLE">EXECUTABLE</option>
+            <option value="WATCH">WATCH</option>
+            <option value="IGNORE">IGNORE</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="regimeFilter">Regime</label>
+          <select id="regimeFilter">
+            <option value="ALL">Todos</option>
+            <option value="TREND">TREND</option>
+            <option value="RANGE">RANGE</option>
+            <option value="NEUTRAL">NEUTRAL</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="lookbackFilter">Lookback sinais</label>
+          <select id="lookbackFilter">
+            <option value="50">50</option>
+            <option value="100" selected>100</option>
+            <option value="200">200</option>
+            <option value="500">500</option>
+            <option value="999999">Todos</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="tvSymbol">TradingView symbol</label>
+          <select id="tvSymbol"></select>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid cards section" id="cards"></section>
+
+    <section class="card section">
+      <h2>Performance</h2>
+      <div id="performanceCards" class="grid cards"></div>
+    </section>
+
+    <section class="card section">
+      <h2>Exchange Reality</h2>
+      <div id="exchangeCards" class="grid cards"></div>
+    </section>
+
+    <section class="card section">
+      <h2>Execution Metrics</h2>
+      <div id="executionMetricsCards" class="grid cards"></div>
+    </section>
+
+    <section class="card section">
+      <h2>Execution Modes</h2>
+      <div id="executionModesCards" class="grid cards"></div>
+    </section>
+
+    <section class="two-col section">
+      <div class="card">
+        <h2>TradingView</h2>
+        <div id="tvChart" class="tv-chart"></div>
+      </div>
+
+      <div class="card">
+        <h2>Resumo do filtro atual</h2>
+        <div id="filterSummary"></div>
+      </div>
+    </section>
+
+    <section class="two-col section">
+      <div class="card">
+        <h2>Top Assets Reais</h2>
+        <div id="exchangeBalances"></div>
+      </div>
+
+      <div class="card">
+        <h2>Open Orders Reais</h2>
+        <div id="exchangeOpenOrders"></div>
+      </div>
+    </section>
+
+    <section class="grid chart-grid section">
+      <div class="card">
+        <h2>Sinais por classe</h2>
+        <canvas id="classChart"></canvas>
+      </div>
+
+      <div class="card">
+        <h2>Regime de mercado</h2>
+        <canvas id="regimeChart"></canvas>
+      </div>
+
+      <div class="card">
+        <h2>Distribuição por score</h2>
+        <canvas id="scoreChart"></canvas>
+      </div>
+
+      <div class="card">
+        <h2>PnL médio por símbolo</h2>
+        <canvas id="symbolPnlChart"></canvas>
+      </div>
+    </section>
+
+    <section class="two-col section">
+      <div class="card">
+        <h2>Performance por símbolo</h2>
+        <div id="bySymbol"></div>
+      </div>
+
+      <div class="card">
+        <h2>Distribuição por score</h2>
+        <div id="byScore"></div>
+      </div>
+    </section>
+
+    <section class="card section">
+      <h2>Open Signals</h2>
+      <div id="openSignals"></div>
+    </section>
+
+    <section class="card section">
+      <div class="tabs-header">
+        <h2>Histórico</h2>
+        <div class="tabs-nav">
+          <button class="tab-btn active" data-tab="executionsTab">Últimas Executions</button>
+          <button class="tab-btn" data-tab="closedTab">Últimos Closed Signals</button>
+          <button class="tab-btn" data-tab="signalsTab">Últimos Sinais Avaliados</button>
+        </div>
+      </div>
+
+      <div id="executionsTab" class="tab-panel active">
+        <div id="recentExecutions"></div>
+      </div>
+
+      <div id="closedTab" class="tab-panel">
+        <div id="recentClosed"></div>
+      </div>
+
+      <div id="signalsTab" class="tab-panel">
+        <div id="recentSignals"></div>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://s3.tradingview.com/tv.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

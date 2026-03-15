@@ -15,13 +15,13 @@
     "PULLBACK_BAND_ATR": 0.4,
     "ENABLED": true
   },
-  "SOLUSDC": {
+  "SHIBUSDC": {
     "RSI_MIN": 42,
-    "RSI_MAX": 48,
-    "SL_ATR_MULT": 4,
-    "TP_ATR_MULT": 5,
+    "RSI_MAX": 45,
+    "SL_ATR_MULT": 5,
+    "TP_ATR_MULT": 4,
     "PULLBACK_BAND_ATR": 0.4,
-    "ENABLED": true
+    "ENABLED": false
   },
   "BTCUSDC": {
     "RSI_MIN": 42,
@@ -31,12 +31,12 @@
     "PULLBACK_BAND_ATR": 0.4,
     "ENABLED": false
   },
-  "LINKUSDC": {
-    "RSI_MIN": 30,
+  "XRPUSDC": {
+    "RSI_MIN": 38,
     "RSI_MAX": 45,
-    "SL_ATR_MULT": 7,
-    "TP_ATR_MULT": 5,
+    "SL_ATR_MULT": 5,
+    "TP_ATR_MULT": 8,
     "PULLBACK_BAND_ATR": 0.4,
-    "ENABLED": false
+    "ENABLED": true
   }
 }

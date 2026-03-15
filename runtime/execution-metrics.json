@@ -1,0 +1,192 @@
+[
+  {
+    "ts": 1773577940494,
+    "symbol": "ETHUSDC",
+    "entrySignal": 2117.49,
+    "entryFill": 2117.84,
+    "slippagePct": 0.00016529003678901144,
+    "latencyInternal": 1135,
+    "latencyExchange": 310,
+    "latencyTotal": 1445
+  },
+  {
+    "ts": 1773577943228,
+    "symbol": "XRPUSDC",
+    "entrySignal": 1.4173,
+    "entryFill": 1.4184999999999999,
+    "slippagePct": 0.0008466803076270852,
+    "latencyInternal": 1421,
+    "latencyExchange": 262,
+    "latencyTotal": 1683
+  },
+  {
+    "ts": 1773580370600,
+    "symbol": "XRPUSDC",
+    "entrySignal": 1.4218,
+    "entryFill": 1.4220000000000002,
+    "slippagePct": 0.00014066676044464764,
+    "latencyInternal": 1406,
+    "latencyExchange": 303,
+    "latencyTotal": 1709
+  },
+  {
+    "ts": 1773581229967,
+    "symbol": "ETHUSDC",
+    "entrySignal": 2097.52,
+    "entryFill": 2097.2400000000002,
+    "slippagePct": 0.0001334909798236705,
+    "latencyInternal": 1650,
+    "latencyExchange": 321,
+    "latencyTotal": 1971
+  },
+  {
+    "ts": 1773582358451,
+    "symbol": "BNBUSDC",
+    "entrySignal": 657.9,
+    "entryFill": 657.5999999999999,
+    "slippagePct": 0.00045599635202928746,
+    "latencyInternal": 1174,
+    "latencyExchange": 316,
+    "latencyTotal": 1490
+  },
+  {
+    "ts": 1773585672582,
+    "symbol": "ETHUSDC",
+    "entrySignal": 2089.9,
+    "entryFill": 2089.7200000000003,
+    "slippagePct": 0.000086128522895754,
+    "latencyInternal": 1202,
+    "latencyExchange": 317,
+    "latencyTotal": 1519
+  },
+  {
+    "ts": 1773587824024,
+    "symbol": "ETHUSDC",
+    "entrySignal": 2093.41,
+    "entryFill": 2093.4100000000003,
+    "slippagePct": 2.172280398423931e-16,
+    "latencyInternal": 1690,
+    "latencyExchange": 306,
+    "latencyTotal": 1996
+  },
+  {
+    "ts": 1773592061254,
+    "symbol": "XRPUSDC",
+    "entrySignal": 1.4132,
+    "entryFill": 1.4132506329113925,
+    "slippagePct": 0.00003582855320726855,
+    "latencyInternal": 994,
+    "latencyExchange": 337,
+    "latencyTotal": 1331
+  },
+  {
+    "ts": 1773596965554,
+    "symbol": "ETHUSDC",
+    "entrySignal": 2097.54,
+    "entryFill": 2097.63,
+    "slippagePct": 0.000042907405818313606,
+    "latencyInternal": 1009,
+    "latencyExchange": 324,
+    "latencyTotal": 1333
+  },
+  {
+    "ts": 1773598321244,
+    "symbol": "BNBUSDC",
+    "entrySignal": 661.95,
+    "entryFill": 661.9300000000001,
+    "slippagePct": 0.00003021376236873149,
+    "latencyInternal": 1012,
+    "latencyExchange": 299,
+    "latencyTotal": 1311
+  },
+  {
+    "ts": 1773598323081,
+    "symbol": "XRPUSDC",
+    "entrySignal": 1.4202,
+    "entryFill": 1.4201,
+    "slippagePct": 0.00007041261794112731,
+    "latencyInternal": 1012,
+    "latencyExchange": 264,
+    "latencyTotal": 1276
+  },
+  {
+    "ts": 1773598940342,
+    "symbol": "ETHUSDC",
+    "entrySignal": 2109.72,
+    "entryFill": 2109.5499999999997,
+    "slippagePct": 0.00008057941338190507,
+    "latencyInternal": 990,
+    "latencyExchange": 335,
+    "latencyTotal": 1325
+  },
+  {
+    "ts": 1773601279267,
+    "symbol": "ETHUSDC",
+    "entrySignal": 2101.74,
+    "entryFill": 2101.86,
+    "slippagePct": 0.00005709554940208856,
+    "latencyInternal": 1021,
+    "latencyExchange": 317,
+    "latencyTotal": 1338
+  },
+  {
+    "ts": 1773601281593,
+    "symbol": "XRPUSDC",
+    "entrySignal": 1.4125,
+    "entryFill": 1.4117,
+    "slippagePct": 0.000566371681416024,
+    "latencyInternal": 1002,
+    "latencyExchange": 265,
+    "latencyTotal": 1267
+  },
+  {
+    "ts": 1773601527437,
+    "symbol": "BNBUSDC",
+    "entrySignal": 659.2,
+    "entryFill": 659.11,
+    "slippagePct": 0.0001365291262136405,
+    "latencyInternal": 1032,
+    "latencyExchange": 314,
+    "latencyTotal": 1346
+  },
+  {
+    "ts": 1773603495783,
+    "symbol": "ETHUSDC",
+    "entrySignal": 2112.06,
+    "entryFill": 2110.7200000000003,
+    "slippagePct": 0.0006344516727743013,
+    "latencyInternal": 1012,
+    "latencyExchange": 342,
+    "latencyTotal": 1354
+  },
+  {
+    "ts": 1773607675339,
+    "symbol": "XRPUSDC",
+    "entrySignal": 1.419,
+    "entryFill": 1.419,
+    "slippagePct": 0,
+    "latencyInternal": 1054,
+    "latencyExchange": 465,
+    "latencyTotal": 1519
+  },
+  {
+    "ts": 1773607988266,
+    "symbol": "ETHUSDC",
+    "entrySignal": 2130.24,
+    "entryFill": 2130.0099999999998,
+    "slippagePct": 0.00010796905512994696,
+    "latencyInternal": 979,
+    "latencyExchange": 335,
+    "latencyTotal": 1314
+  },
+  {
+    "ts": 1773608112422,
+    "symbol": "BNBUSDC",
+    "entrySignal": 664.12,
+    "entryFill": 664.27,
+    "slippagePct": 0.00022586279588022835,
+    "latencyInternal": 996,
+    "latencyExchange": 309,
+    "latencyTotal": 1305
+  }
+]

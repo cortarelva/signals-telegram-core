@@ -5,24 +5,27 @@
   "main": "signals-telegram-core.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "run": "node signals-telegram-core.js",
-    "loop": "while true; do node signals-telegram-core.js; sleep 300; done",
-    "analyze": "node analyze-state.js",
+    "run": "node runtime/signals-telegram-core.js",
+    "loop": "while true; do node runtime/signals-telegram-core.js; sleep 60; done",
+    "analyze": "node research/analyze-state.js",
+    "backfill": "node research/backfill-dataset.js",
+    "backtest": "node research/backtest-bot.js",
+    "report": "node research/strategy-report.js",
+    "walk": "node research/walk-forward-test.js",
+    "multi": "node research/multi-symbol-backtest.js",
+    "optimize": "node optimization/optimize-strategy.js",
+    "optimize-symbols": "node optimization/optimize-per-symbol.js",
+    "auto": "node optimization/auto-improve.js",
     "simulate": "node simulate-params.js",
-    "optimize": "node optimize-strategy.js",
-    "backfill": "node backfill-dataset.js",
-    "backtest": "node backtest-bot.js",
-    "auto": "node auto-improve.js",
-    "report": "node strategy-report.js",
-    "walk": "node walk-forward-test.js",
-    "multi": "node multi-symbol-backtest.js",
-    "optimize-symbols": "node optimize-per-symbol.js"
+    "dashboard": "node runtime/dashboard-server.js",
+    "account": "node runtime/test-binance-account.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "axios": "^1.13.5",
-    "dotenv": "^17.3.1"
+    "dotenv": "^17.3.1",
+    "node-binance-api": "^1.0.22"
   }
 }

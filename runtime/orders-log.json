@@ -4700,5 +4700,137 @@
         }
       ]
     }
+  },
+  {
+    "ts": 1773610697371,
+    "type": "real_sell_close",
+    "symbol": "ETHUSDC",
+    "side": "SELL",
+    "quantity": 0.0051,
+    "exitPrice": 2143.32,
+    "pnlPct": 0.6248796954004885,
+    "closeReason": "TP",
+    "linkedExecutionId": "binance_real_1773607988269_ETHUSDC",
+    "exchange": {
+      "test": false,
+      "entryOrderId": 9574893175,
+      "entryClientOrderId": "x-B3AUXNYVc56ed807f8cc421ea28850",
+      "entryTransactTime": 1773607988143,
+      "entryStatus": "FILLED",
+      "entryExecutedQty": "0.00510000",
+      "entryQuoteQty": "10.86305100",
+      "entryFills": [
+        {
+          "price": "2130.01000000",
+          "qty": "0.00510000",
+          "commission": "0.00001166",
+          "commissionAsset": "BNB",
+          "tradeId": 352430976
+        }
+      ],
+      "exitOrderId": 9575162929,
+      "exitClientOrderId": "x-B3AUXNYV034aab8df0fd4be1b2dc6b",
+      "exitTransactTime": 1773610697265,
+      "exitStatus": "FILLED",
+      "exitExecutedQty": "0.00510000",
+      "exitQuoteQty": "10.93093200",
+      "exitFills": [
+        {
+          "price": "2143.32000000",
+          "qty": "0.00510000",
+          "commission": "0.00001164",
+          "commissionAsset": "BNB",
+          "tradeId": 352443504
+        }
+      ]
+    }
+  },
+  {
+    "ts": 1773610699619,
+    "type": "real_sell_close",
+    "symbol": "BNBUSDC",
+    "side": "SELL",
+    "quantity": 0.014,
+    "exitPrice": 668.3,
+    "pnlPct": 0.606681018260643,
+    "closeReason": "TP",
+    "linkedExecutionId": "binance_real_1773608112425_BNBUSDC",
+    "exchange": {
+      "test": false,
+      "entryOrderId": 2553012427,
+      "entryClientOrderId": "x-B3AUXNYV81e177e782484da29f6338",
+      "entryTransactTime": 1773608112319,
+      "entryStatus": "FILLED",
+      "entryExecutedQty": "0.01400000",
+      "entryQuoteQty": "9.29978000",
+      "entryFills": [
+        {
+          "price": "664.27000000",
+          "qty": "0.01400000",
+          "commission": "0.00000997",
+          "commissionAsset": "BNB",
+          "tradeId": 102732406
+        }
+      ],
+      "exitOrderId": 2553067713,
+      "exitClientOrderId": "x-B3AUXNYV23097e609e0c4270bf52fe",
+      "exitTransactTime": 1773610699520,
+      "exitStatus": "FILLED",
+      "exitExecutedQty": "0.01400000",
+      "exitQuoteQty": "9.35620000",
+      "exitFills": [
+        {
+          "price": "668.30000000",
+          "qty": "0.01400000",
+          "commission": "0.00000996",
+          "commissionAsset": "BNB",
+          "tradeId": 102734091
+        }
+      ]
+    }
+  },
+  {
+    "ts": 1773610701975,
+    "type": "real_sell_close",
+    "symbol": "XRPUSDC",
+    "side": "SELL",
+    "quantity": 8.5,
+    "exitPrice": 1.4288,
+    "pnlPct": 0.6906272022551113,
+    "closeReason": "TP",
+    "linkedExecutionId": "binance_real_1773607675342_XRPUSDC",
+    "exchange": {
+      "test": false,
+      "entryOrderId": 3265274086,
+      "entryClientOrderId": "x-B3AUXNYV76d98f27d2634a37bf38a4",
+      "entryTransactTime": 1773607675116,
+      "entryStatus": "FILLED",
+      "entryExecutedQty": "8.60000000",
+      "entryQuoteQty": "12.20340000",
+      "entryFills": [
+        {
+          "price": "1.41900000",
+          "qty": "8.60000000",
+          "commission": "0.00001309",
+          "commissionAsset": "BNB",
+          "tradeId": 133645417
+        }
+      ],
+      "exitOrderId": 3265331120,
+      "exitClientOrderId": "x-B3AUXNYV66de9bedc5d84161ac09c4",
+      "exitTransactTime": 1773610701870,
+      "exitStatus": "FILLED",
+      "exitExecutedQty": "8.50000000",
+      "exitQuoteQty": "12.14480000",
+      "exitFills": [
+        {
+          "price": "1.42880000",
+          "qty": "8.50000000",
+          "commission": "0.00001294",
+          "commissionAsset": "BNB",
+          "tradeId": 133647223
+        }
+      ]
+    }
   }
 ]

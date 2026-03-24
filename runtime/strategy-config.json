@@ -1,42 +1,67 @@
 {
   "ETHUSDC": {
     "RSI_MIN": 42,
-    "RSI_MAX": 45,
-    "SL_ATR_MULT": 4,
-    "TP_ATR_MULT": 5,
-    "PULLBACK_BAND_ATR": 0.4,
-    "ENABLED": true
+    "RSI_MAX": 48,
+    "SL_ATR_MULT": 3.0,
+    "TP_ATR_MULT": 5.0,
+    "PULLBACK_BAND_ATR": 0.5,
+    "REQUIRE_SR": true,
+    "MIN_SPACE_TO_TARGET_ATR": 1.0,
+    "MAX_DISTANCE_FROM_SUPPORT_ATR": 1.0,
+    "TP_RESISTANCE_BUFFER_ATR": 0.15,
+    "REQUIRE_TREND": true,
+    "ENABLED": false
   },
   "BNBUSDC": {
+    "RSI_MIN": 40,
+    "RSI_MAX": 48,
+    "SL_ATR_MULT": 3.0,
+    "TP_ATR_MULT": 6.0,
+    "PULLBACK_BAND_ATR": 0.5,
+    "REQUIRE_SR": true,
+    "MIN_SPACE_TO_TARGET_ATR": 1.2,
+    "MAX_DISTANCE_FROM_SUPPORT_ATR": 1.0,
+    "TP_RESISTANCE_BUFFER_ATR": 0.15,
+    "REQUIRE_TREND": true,
+    "ENABLED": true
+  },
+  "ADAUSDC": {
+    "RSI_MIN": 40,
+    "RSI_MAX": 47,
+    "SL_ATR_MULT": 3.0,
+    "TP_ATR_MULT": 6.0,
+    "PULLBACK_BAND_ATR": 0.5,
+    "REQUIRE_SR": true,
+    "MIN_SPACE_TO_TARGET_ATR": 1.2,
+    "MAX_DISTANCE_FROM_SUPPORT_ATR": 1.2,
+    "TP_RESISTANCE_BUFFER_ATR": 0.15,
+    "REQUIRE_TREND": true,
+    "ENABLED": true
+  },
+  "XRPUSDC": {
     "RSI_MIN": 38,
     "RSI_MAX": 45,
-    "SL_ATR_MULT": 5,
-    "TP_ATR_MULT": 8,
+    "SL_ATR_MULT": 2.5,
+    "TP_ATR_MULT": 5.0,
     "PULLBACK_BAND_ATR": 0.4,
+    "REQUIRE_SR": true,
+    "MIN_SPACE_TO_TARGET_ATR": 1.2,
+    "MAX_DISTANCE_FROM_SUPPORT_ATR": 1.2,
+    "TP_RESISTANCE_BUFFER_ATR": 0.15,
+    "REQUIRE_TREND": false,
     "ENABLED": true
   },
   "SHIBUSDC": {
     "RSI_MIN": 42,
     "RSI_MAX": 45,
-    "SL_ATR_MULT": 5,
-    "TP_ATR_MULT": 4,
+    "SL_ATR_MULT": 3.0,
+    "TP_ATR_MULT": 4.5,
     "PULLBACK_BAND_ATR": 0.4,
+    "REQUIRE_SR": true,
+    "MIN_SPACE_TO_TARGET_ATR": 1.0,
+    "MAX_DISTANCE_FROM_SUPPORT_ATR": 1.5,
+    "TP_RESISTANCE_BUFFER_ATR": 0.15,
+    "REQUIRE_TREND": false,
     "ENABLED": false
-  },
-  "BTCUSDC": {
-    "RSI_MIN": 42,
-    "RSI_MAX": 45,
-    "SL_ATR_MULT": 5,
-    "TP_ATR_MULT": 4,
-    "PULLBACK_BAND_ATR": 0.4,
-    "ENABLED": false
-  },
-  "XRPUSDC": {
-    "RSI_MIN": 38,
-    "RSI_MAX": 45,
-    "SL_ATR_MULT": 5,
-    "TP_ATR_MULT": 8,
-    "PULLBACK_BAND_ATR": 0.4,
-    "ENABLED": true
   }
 }

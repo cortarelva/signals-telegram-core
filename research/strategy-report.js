@@ -1,6 +1,6 @@
 const fs = require("fs");
 
-function loadState(path = "./state.json") {
+function loadState(path = "runtime/state.json") {
   return JSON.parse(fs.readFileSync(path, "utf8"));
 }
 

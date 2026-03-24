@@ -619,25 +619,33 @@ function renderOpenSignals(openSignals) {
 }
 
 function renderRecentExecutions(recentExecutions) {
-  const rows = recentExecutions.map((e) => `
-    <tr>
-      <td>${new Date(e.ts).toLocaleString()}</td>
-      <td>${e.symbol || "-"}</td>
-      <td>${e.tf || "-"}</td>
-      <td>${modePill(e.mode)}</td>
-      <td>${e.side || "-"}</td>
-      <td>${fmt(e.entry)}</td>
-      <td>${fmt(e.sl)}</td>
-      <td>${fmt(e.tp)}</td>
-      <td>${fmt(Number(e.score || 0), 0)}</td>
-      <td>${statusPill(e.status)}</td>
-      <td>${fmt(Number(e.quantity), 6)}</td>
-      <td>${fmt(Number(e.tradeUsd || e.positionUsd || 0), 2)}</td>
-      <td>${outcomePill(e.outcome)}</td>
-      <td>${fmt(Number(e.pnlPct))}</td>
-      <td>${fmt(Number(e.exitPrice || 0), 6)}</td>
-    </tr>
-  `).join("");
+  const rows = recentExecutions.map((e) => {
+    const actionBtn =
+      e.status === "OPEN"
+        ? `<button class="sell-btn" onclick="marketSellNow('${String(e.id || "")}', '${String(e.symbol || "")}')">Sell Now</button>`
+        : "-";
+
+    return `
+      <tr>
+        <td>${new Date(e.ts).toLocaleString()}</td>
+        <td>${e.symbol || "-"}</td>
+        <td>${e.tf || "-"}</td>
+        <td>${modePill(e.mode)}</td>
+        <td>${e.side || "-"}</td>
+        <td>${fmt(e.entry)}</td>
+        <td>${fmt(e.sl)}</td>
+        <td>${fmt(e.tp)}</td>
+        <td>${fmt(Number(e.score || 0), 0)}</td>
+        <td>${statusPill(e.status)}</td>
+        <td>${fmt(Number(e.quantity), 6)}</td>
+        <td>${fmt(Number(e.tradeUsd || e.positionUsd || 0), 2)}</td>
+        <td>${outcomePill(e.outcome)}</td>
+        <td>${fmt(Number(e.pnlPct))}</td>
+        <td>${fmt(Number(e.exitPrice || 0), 6)}</td>
+        <td>${actionBtn}</td>
+      </tr>
+    `;
+  }).join("");
 
   document.getElementById("recentExecutions").innerHTML = `
     <table>
@@ -658,11 +666,48 @@ function renderRecentExecutions(recentExecutions) {
           <th>Outcome</th>
           <th>PnL %</th>
           <th>Exit</th>
+          <th>Action</th>
         </tr>
       </thead>
-      <tbody>${rows || `<tr><td colspan="15">Sem executions.</td></tr>`}</tbody>
+      <tbody>${rows || `<tr><td colspan="16">Sem executions.</td></tr>`}</tbody>
     </table>
   `;
+}
+
+async function marketSellNow(executionId, symbol) {
+  const ok = window.confirm(
+    `Fechar ${symbol || "posição"} ao mercado agora?`
+  );
+
+  if (!ok) return;
+
+  try {
+    const res = await fetch("/api/market-sell", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ executionId }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || data.ok === false) {
+      alert(`Erro ao fechar posição: ${data.error || data.reason || "unknown_error"}`);
+      return;
+    }
+
+    alert(
+      `Posição fechada.\n` +
+      `Símbolo: ${data.symbol || symbol || "-"}\n` +
+      `Exit: ${fmt(Number(data.exitPrice || 0), 6)}\n` +
+      `PnL: ${fmt(Number(data.pnlPct || 0), 2)}%`
+    );
+
+    await load();
+  } catch (err) {
+    alert(`Erro ao fechar posição: ${err.message}`);
+  }
 }
 
 function renderRecentClosed(recentClosed) {

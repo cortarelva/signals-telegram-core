@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>EazyBot Live</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <h1>EazyBot Live Dashboard</h1>
+
+  <div class="cards">
+    <div class="card">
+      <h2>Balance</h2>
+      <p id="balance">-</p>
+    </div>
+
+    <div class="card">
+      <h2>Profit</h2>
+      <p id="pnl">-</p>
+    </div>
+
+    <div class="card">
+      <h2>Win Rate</h2>
+      <p id="winrate">-</p>
+    </div>
+  </div>
+
+  <h2>Open Trades</h2>
+  <table id="openTrades"></table>
+
+  <h2>Recent Closed Trades</h2>
+  <table id="closedTrades"></table>
+
+  <script src="app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<h2>Equity Curve</h2>
+<canvas id="equityChart" height="100"></canvas>
+</body>
+</html>

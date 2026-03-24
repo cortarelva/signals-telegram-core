@@ -4,49 +4,32 @@ const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
 const { paperExecute, closeExecutionForSignal } = require("./paper-executor");
-
-const BASE_CONFIG = require("./strategy-config.json");
-const GENERATED_CONFIG_FILE = path.join(__dirname, "strategy-config.generated.json");
-
-function loadStrategyConfig() {
-  let generatedConfig = {};
-
-  try {
-    generatedConfig = JSON.parse(
-      fs.readFileSync(GENERATED_CONFIG_FILE, "utf8")
-    );
-  } catch {
-    generatedConfig = {};
-  }
-
-  const mergedConfig = { ...BASE_CONFIG };
-
-  for (const symbol of Object.keys(generatedConfig)) {
-    mergedConfig[symbol] = {
-      ...(BASE_CONFIG[symbol] || {}),
-      ...generatedConfig[symbol],
-    };
-  }
-
-  return mergedConfig;
-}
-
-const strategyConfig = loadStrategyConfig();
+const { loadRuntimeConfig } = require("./config/load-runtime-config");
+const {
+  detectSupportResistance,
+  nearestSupportBelow,
+  nearestResistanceAbove,
+  evaluateTradeZone,
+} = require("./support-resistance");
 
 // =========================
 // Config
 // =========================
 
-const SYMBOLS = Object.keys(strategyConfig).filter(
-  (symbol) => strategyConfig[symbol]?.ENABLED
-);
+function getEnabledSymbols() {
+  const strategyConfig = loadRuntimeConfig();
+  return Object.keys(strategyConfig).filter(
+    (symbol) => strategyConfig[symbol]?.ENABLED
+  );
+}
 
 const TF = process.env.TF || "5m";
 const LIMIT = Number(process.env.LIMIT || 1000);
-const COOLDOWN_MINS = Number(process.env.COOLDOWN_MINS || 30);
+const COOLDOWN_MINS = Number(process.env.COOLDOWN_MINS || 10);
 
 const ENABLE_TELEGRAM =
-  String(process.env.ENABLE_TELEGRAM ?? process.env.SEND_TELEGRAM ?? "0") === "1";
+  String(process.env.ENABLE_TELEGRAM ?? process.env.SEND_TELEGRAM ?? "0") ===
+  "1";
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || "";
 
@@ -114,6 +97,169 @@ function round(n, decimals = 2) {
   return Number(n.toFixed(decimals));
 }
 
+function getPriceDigits(symbol) {
+  if (!symbol) return 2;
+  if (symbol.includes("SHIB")) return 8;
+  if (symbol.includes("XRP")) return 4;
+  if (symbol.includes("ADA")) return 4;
+  return 2;
+}
+
+function fmtPrice(value, symbol) {
+  if (!Number.isFinite(Number(value))) return "-";
+  return Number(value).toFixed(getPriceDigits(symbol));
+}
+
+function fmtQty(value) {
+  if (!Number.isFinite(Number(value))) return "-";
+  return Number(value).toFixed(8);
+}
+
+function fmtUsd(value, digits = 2) {
+  if (!Number.isFinite(Number(value))) return "-";
+  return Number(value).toFixed(digits);
+}
+
+function fmtPct(value, digits = 2) {
+  if (!Number.isFinite(Number(value))) return "-";
+  const n = Number(value);
+  return `${n >= 0 ? "+" : ""}${n.toFixed(digits)}%`;
+}
+
+function tfToMinutes(tf) {
+  const m = String(tf || "").match(/^(\d+)(m|h)$/i);
+  if (!m) return null;
+
+  const amount = Number(m[1]);
+  const unit = m[2].toLowerCase();
+
+  if (unit === "m") return amount;
+  if (unit === "h") return amount * 60;
+  return null;
+}
+
+function getSignalValidityText(tf, candles = 2) {
+  const minutesPerCandle = tfToMinutes(tf);
+  if (!minutesPerCandle) return `${candles} velas`;
+  const total = minutesPerCandle * candles;
+  return `${candles} velas (≈ ${total} min)`;
+}
+
+function calcDurationText(openTs, closeTs = Date.now()) {
+  if (!Number.isFinite(Number(openTs)) || !Number.isFinite(Number(closeTs))) {
+    return "-";
+  }
+
+  const totalMinutes = Math.max(0, Math.round((closeTs - openTs) / 60000));
+
+  if (totalMinutes < 60) return `${totalMinutes} min`;
+
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return `${h}h ${m}min`;
+}
+
+function calcPotentialPnLUsdc(entry, target, qty, side = "BUY") {
+  if (
+    !Number.isFinite(Number(entry)) ||
+    !Number.isFinite(Number(target)) ||
+    !Number.isFinite(Number(qty))
+  ) {
+    return null;
+  }
+
+  const e = Number(entry);
+  const t = Number(target);
+  const q = Number(qty);
+
+  if (String(side || "BUY").toUpperCase() === "SELL") {
+    return (e - t) * q;
+  }
+
+  return (t - e) * q;
+}
+
+function aggregateCommissionByAsset(fills = []) {
+  const totals = {};
+
+  for (const fill of Array.isArray(fills) ? fills : []) {
+    const asset = fill?.commissionAsset;
+    const amount = Number(fill?.commission || 0);
+
+    if (!asset || !Number.isFinite(amount) || amount <= 0) continue;
+    totals[asset] = (totals[asset] || 0) + amount;
+  }
+
+  return totals;
+}
+
+function mergeCommissionMaps(...maps) {
+  const merged = {};
+
+  for (const map of maps) {
+    for (const [asset, amount] of Object.entries(map || {})) {
+      merged[asset] = (merged[asset] || 0) + amount;
+    }
+  }
+
+  return merged;
+}
+
+function formatCommissionMap(map) {
+  const parts = Object.entries(map || {})
+    .filter(([, amount]) => Number.isFinite(amount) && amount > 0)
+    .map(([asset, amount]) => `${Number(amount).toFixed(8)} ${asset}`);
+
+  return parts.length ? parts.join(" + ") : "-";
+}
+
+function getEntryCommissionText(order) {
+  const entryMap = aggregateCommissionByAsset(order?.exchange?.entryFills || []);
+  const actual = formatCommissionMap(entryMap);
+
+  if (actual !== "-") return actual;
+
+  const tradeUsd = Number(order?.tradeUsd || order?.positionUsd || 0);
+  const commissionRate = Number(order?.commissionRate || 0);
+
+  if (tradeUsd > 0 && commissionRate > 0) {
+    return `${fmtUsd(tradeUsd * commissionRate, 4)} USDC (estimada)`;
+  }
+
+  return "-";
+}
+
+function getTotalCommissionText(closedExecution) {
+  const entryMap = aggregateCommissionByAsset(
+    closedExecution?.exchange?.entryFills || []
+  );
+  const exitMap = aggregateCommissionByAsset(
+    closedExecution?.exchange?.exitFills || []
+  );
+  const merged = mergeCommissionMaps(entryMap, exitMap);
+  const actual = formatCommissionMap(merged);
+
+  if (actual !== "-") return actual;
+
+  const entryQuoteQty = Number(closedExecution?.entryQuoteQty || 0);
+  const exitQuoteQty = Number(closedExecution?.exitQuoteQty || 0);
+  const tradeUsd = Number(closedExecution?.tradeUsd || 0);
+  const commissionRate = Number(closedExecution?.commissionRate || 0);
+
+  const estimatedBase =
+    entryQuoteQty > 0 && exitQuoteQty > 0
+      ? entryQuoteQty + exitQuoteQty
+      : tradeUsd > 0
+      ? tradeUsd * 2
+      : 0;
+
+  if (estimatedBase > 0 && commissionRate > 0) {
+    return `${fmtUsd(estimatedBase * commissionRate, 4)} USDC (estimada)`;
+  }
+
+  return "-";
+}
+
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
@@ -175,14 +321,17 @@ async function sendTelegramMessage(text) {
       {
         chat_id: TELEGRAM_CHAT_ID,
         text,
+        parse_mode: "Markdown",
       },
       { timeout: 15000 }
     );
   } catch (err) {
-    console.error("[TG] erro ao enviar mensagem:", err.response?.data || err.message);
+    console.error(
+      "[TG] erro ao enviar mensagem:",
+      err.response?.data || err.message
+    );
   }
 }
-
 
 function buildExecutedTradeTelegramMessage({
   symbol,
@@ -198,20 +347,44 @@ function buildExecutedTradeTelegramMessage({
   const order = execResult?.order || {};
   const qty = Number(order.quantity || 0);
   const tradeUsd = Number(order.tradeUsd || order.positionUsd || 0);
-  const mode = order.mode || execResult?.mode || "unknown";
+
+  const potentialProfit = calcPotentialPnLUsdc(entry, tp, qty, side);
+  const maxLoss = calcPotentialPnLUsdc(entry, sl, qty, side);
+
+  const profitPct =
+    tradeUsd > 0 && Number.isFinite(potentialProfit)
+      ? (potentialProfit / tradeUsd) * 100
+      : null;
+
+  const lossPct =
+    tradeUsd > 0 && Number.isFinite(maxLoss)
+      ? (maxLoss / tradeUsd) * 100
+      : null;
+
+  const entryCommission = getEntryCommissionText(order);
 
   return (
-    `*TRADE EXECUTADA* 🟢\n` +
-    `${symbol} ${tf}\n\n` +
-    `*Side:* ${side}\n` +
-    `*Entry:* ${round(entry, 6)}\n` +
-    `*SL:* ${round(sl, 6)}\n` +
-    `*TP:* ${round(tp, 6)}\n` +
-    `*Qty:* ${round(qty, 8)}\n` +
-    `*Notional:* ${round(tradeUsd, 2)}\n` +
-    `*Mode:* ${mode}\n\n` +
-    `*Score:* ${score}\n` +
-    `*Class:* ${signalClass}`
+    `🟢 *NOVA TRADE*\n` +
+    `${symbol} · ${side} · ${tf}\n\n` +
+    `*Preço de entrada:* ${fmtPrice(entry, symbol)}\n` +
+    `*Take Profit:* ${fmtPrice(tp, symbol)}\n` +
+    `*Stop Loss:* ${fmtPrice(sl, symbol)}\n\n` +
+    `*Valor investido:* ${fmtUsd(tradeUsd)} USDC\n` +
+    `*Quantidade:* ${fmtQty(qty)}\n` +
+    `*Comissão de entrada:* ${entryCommission}\n\n` +
+    `*Lucro potencial:* ${
+      Number.isFinite(potentialProfit)
+        ? `${fmtUsd(potentialProfit)} USDC (${fmtPct(profitPct)})`
+        : "-"
+    }\n` +
+    `*Perda máxima:* ${
+      Number.isFinite(maxLoss)
+        ? `-${fmtUsd(Math.abs(maxLoss))} USDC (-${Math.abs(
+            Number(lossPct || 0)
+          ).toFixed(2)}%)`
+        : "-"
+    }\n\n` +
+    `*Validade do sinal:* ${getSignalValidityText(tf)}`
   );
 }
 
@@ -221,13 +394,13 @@ function buildClosedTradeTelegramMessage({
   closedSignal,
   closedExecution = null,
 }) {
-  const outcomeLabel = closedSignal.outcome === "TP" ? "✅ TP" : "❌ SL";
+  const outcome = closedSignal.outcome === "TP" ? "TP" : "SL";
 
   const realExitPrice = Number(closedExecution?.exitPrice);
   const theoreticalExit =
-    closedSignal.outcome === "TP"
+    outcome === "TP"
       ? Number(closedSignal.tp)
-      : closedSignal.outcome === "SL"
+      : outcome === "SL"
       ? Number(closedSignal.sl)
       : Number(closedSignal.exitRef || 0);
 
@@ -236,20 +409,56 @@ function buildClosedTradeTelegramMessage({
       ? realExitPrice
       : theoreticalExit;
 
-  const shownPnl = Number.isFinite(Number(closedExecution?.pnlPct))
+  const shownPnlPct = Number.isFinite(Number(closedExecution?.pnlPct))
     ? Number(closedExecution.pnlPct)
     : Number(closedSignal.pnlPct || 0);
 
-  const mode = closedExecution?.mode || "unknown";
+  const qty = Number(
+    closedExecution?.quantity ||
+      closedExecution?.entryExecutedQty ||
+      closedSignal?.quantity ||
+      0
+  );
+
+  const tradeUsd = Number(
+    closedExecution?.tradeUsd ||
+      closedExecution?.positionUsd ||
+      (Number(closedSignal.entry || 0) * qty)
+  );
+
+  const grossResultUsd = calcPotentialPnLUsdc(
+    closedSignal.entry,
+    shownExit,
+    qty,
+    closedSignal.side || "BUY"
+  );
+
+  const commissionText = getTotalCommissionText(closedExecution);
+  const durationText = calcDurationText(
+    closedSignal.signalTs || closedSignal.ts,
+    closedSignal.closedTs
+  );
+
+  const title =
+    outcome === "TP"
+      ? `✅ *TRADE FECHADA — TAKE PROFIT*`
+      : `❌ *TRADE FECHADA — STOP LOSS*`;
 
   return (
-    `*TRADE FECHADA* ${outcomeLabel}\n` +
-    `${symbol} ${tf}\n\n` +
-    `*Mode:* ${mode}\n` +
-    `*Entry:* ${round(closedSignal.entry, 6)}\n` +
-    `*Exit:* ${round(shownExit, 6)}\n` +
-    `*PnL:* ${round(shownPnl, 2)}%\n` +
-    `*RR:* ${round(closedSignal.rrRealized ?? 0, 2)}`
+    `${title}\n` +
+    `${symbol} · ${closedSignal.side || "BUY"} · ${tf}\n\n` +
+    `*Preço de entrada:* ${fmtPrice(closedSignal.entry, symbol)}\n` +
+    `*Preço de saída:* ${fmtPrice(shownExit, symbol)}\n\n` +
+    `*Valor investido:* ${fmtUsd(tradeUsd)} USDC\n` +
+    `*Resultado:* ${
+      Number.isFinite(grossResultUsd)
+        ? `${grossResultUsd >= 0 ? "+" : ""}${fmtUsd(grossResultUsd)} USDC`
+        : "-"
+    }\n` +
+    `*Rentabilidade:* ${fmtPct(shownPnlPct)}\n` +
+    `*Comissões:* ${commissionText}\n` +
+    `*RR:* ${round(closedSignal.rrRealized ?? 0, 2)}\n\n` +
+    `*Duração:* ${durationText}`
   );
 }
 
@@ -477,8 +686,8 @@ function calculateSignalScore({
   return clamp(score, 0, 100);
 }
 
-function classifySignal(score) {
-  if (score >= 70) return "EXECUTABLE";
+function classifySignal(score, minExecutableScore = 70) {
+  if (score >= minExecutableScore) return "EXECUTABLE";
   if (score >= 45) return "WATCH";
   return "IGNORE";
 }
@@ -517,17 +726,23 @@ function buildSignal({
     `*TP:* ${tp}\n` +
     `*Class:* ${signalClass}\n` +
     `*Score:* ${score}\n\n` +
-    `EMA20=${round(ema20, 6)} | EMA50=${round(ema50, 6)} | EMA200=${round(ema200, 6)}\n` +
-    `RSI14=${round(rsi, 1)} | ATR14=${round(atr, 6)} | ADX14=${round(adx || 0, 2)}\n` +
-    `Trend=${isTrend} | Sep=${round(emaSeparationPct * 100, 3)}% | Slope=${round(
-      emaSlopePct * 100,
+    `EMA20=${round(ema20, 6)} | EMA50=${round(ema50, 6)} | EMA200=${round(
+      ema200,
+      6
+    )}\n` +
+    `RSI14=${round(rsi, 1)} | ATR14=${round(atr, 6)} | ADX14=${round(
+      adx || 0,
+      2
+    )}\n` +
+    `Trend=${isTrend} | Sep=${round(
+      emaSeparationPct * 100,
       3
-    )}%`;
+    )}% | Slope=${round(emaSlopePct * 100, 3)}%`;
 
   return { side, sl, tp, msg };
 }
 
-function shouldSendSignal(state, { symbol, tf, side, entry }, cooldownMins = 30) {
+function shouldSendSignal(state, { symbol, tf, side, entry }, cooldownMins = 10) {
   const k = keyFor(symbol, tf);
   const last = state.lastSignal[k];
   const now = Date.now();
@@ -538,13 +753,15 @@ function shouldSendSignal(state, { symbol, tf, side, entry }, cooldownMins = 30)
   if (ageMin < cooldownMins) return false;
 
   const entryDiffPct = Math.abs(entry - last.entry) / (last.entry || entry);
-  if (last.side === side && entryDiffPct < 0.0015) return false;
+
+  if (last.side === side && entryDiffPct < 0.0003) return false;
 
   return true;
 }
 
 function updateTracker(state, { symbol, tf, candleHigh, candleLow, candleClose }) {
-  if (!Array.isArray(state.openSignals) || state.openSignals.length === 0) return [];
+  if (!Array.isArray(state.openSignals) || state.openSignals.length === 0)
+    return [];
 
   const stillOpen = [];
   const closedNow = [];
@@ -595,9 +812,13 @@ function updateTracker(state, { symbol, tf, candleHigh, candleLow, candleClose }
 // =========================
 
 async function processSymbol(symbol, state) {
+  const strategyConfig = loadRuntimeConfig();
   const cfg = strategyConfig[symbol];
 
-  if (!cfg || !cfg.ENABLED) return;
+  if (!cfg || !cfg.ENABLED) {
+    console.log(`[ADAPTIVE] ${symbol} disabled by runtime config`);
+    return;
+  }
 
   const RSI_MIN = Number(cfg.RSI_MIN ?? DEFAULT_RSI_MIN);
   const RSI_MAX = Number(cfg.RSI_MAX ?? DEFAULT_RSI_MAX);
@@ -609,6 +830,22 @@ async function processSymbol(symbol, state) {
   const PULLBACK_EMA50_ATR = Number(
     cfg.PULLBACK_EMA50_ATR ?? DEFAULT_PULLBACK_EMA50_ATR
   );
+
+  const MIN_SCORE = Number(cfg.MIN_SCORE ?? PAPER_MIN_SCORE);
+  const MIN_ADX = Number(cfg.MIN_ADX ?? 0);
+  const REQUIRE_TREND = cfg.REQUIRE_TREND === true;
+  const REQUIRE_RANGE = cfg.REQUIRE_RANGE === true;
+  const REQUIRE_NEAR_PULLBACK = cfg.REQUIRE_NEAR_PULLBACK === true;
+  const REQUIRE_STACKED_EMA = cfg.REQUIRE_STACKED_EMA === true;
+  const REQUIRE_NEAR_EMA20 = cfg.REQUIRE_NEAR_EMA20 === true;
+  const REQUIRE_RSI_RISING = cfg.REQUIRE_RSI_RISING === true;
+
+  const REQUIRE_SR = cfg.REQUIRE_SR === true;
+  const MIN_SPACE_TO_TARGET_ATR = Number(cfg.MIN_SPACE_TO_TARGET_ATR ?? 0.8);
+  const MAX_DISTANCE_FROM_SUPPORT_ATR = Number(
+    cfg.MAX_DISTANCE_FROM_SUPPORT_ATR ?? 1.2
+  );
+  const TP_RESISTANCE_BUFFER_ATR = Number(cfg.TP_RESISTANCE_BUFFER_ATR ?? 0.15);
 
   console.log(`[CORE] ${symbol} TF=${TF} limit=${LIMIT} (spot-long only)`);
 
@@ -637,7 +874,15 @@ async function processSymbol(symbol, state) {
   const adx = calcADX(closedCandles, 14);
   const rsiSeries = calcRSISeries(closes, 14);
 
-  if (!ema20 || !ema50 || !ema200 || !prevEma50 || !atr || !adx || rsiSeries.length < 2) {
+  if (
+    !ema20 ||
+    !ema50 ||
+    !ema200 ||
+    !prevEma50 ||
+    !atr ||
+    !adx ||
+    rsiSeries.length < 2
+  ) {
     console.log(`[CORE] ${symbol} indicadores insuficientes.`);
     return;
   }
@@ -673,6 +918,25 @@ async function processSymbol(symbol, state) {
 
   const rsiInBand = rsi >= RSI_MIN && rsi <= RSI_MAX;
   const rsiRising = rsi > prevRsi;
+
+  const entry = last.close;
+
+  const sr = detectSupportResistance(closedCandles, {
+    lookback: 120,
+    atr,
+  });
+
+  const nearestSupport = nearestSupportBelow(entry, sr.supports);
+  const nearestResistance = nearestResistanceAbove(entry, sr.resistances);
+
+  const srEval = evaluateTradeZone({
+    entry,
+    atr,
+    support: nearestSupport,
+    resistance: nearestResistance,
+    minSpaceToTargetAtr: MIN_SPACE_TO_TARGET_ATR,
+    maxDistanceFromSupportAtr: MAX_DISTANCE_FROM_SUPPORT_ATR,
+  });
 
   const closedNow = updateTracker(state, {
     symbol,
@@ -730,25 +994,35 @@ async function processSymbol(symbol, state) {
   );
 
   console.log(
-    `[CORE] ${symbol} close=${round(last.close, 6)} ema20=${round(ema20, 6)} ema50=${round(
-      ema50,
+    `[CORE] ${symbol} close=${round(last.close, 6)} ema20=${round(
+      ema20,
       6
-    )} ema200=${round(ema200, 6)} ` +
-      `rsi=${round(rsi, 2)} prevRsi=${round(prevRsi, 2)} atr=${round(atr, 6)} adx=${round(adx, 2)} ` +
+    )} ema50=${round(ema50, 6)} ema200=${round(ema200, 6)} ` +
+      `rsi=${round(rsi, 2)} prevRsi=${round(prevRsi, 2)} atr=${round(
+        atr,
+        6
+      )} adx=${round(adx, 2)} ` +
       `bullish=${bullish} bullishFast=${bullishFast} stackedEma=${stackedEma} ` +
       `nearEma20=${nearEma20} nearEma50=${nearEma50} nearPullback=${nearPullback} ` +
       `rsiInBand=${rsiInBand} rsiRising=${rsiRising}`
   );
 
-  const score = calculateSignalScore({
+  let score = calculateSignalScore({
     bullish,
     nearPullback,
     rsiInBand,
     rsiRising,
   });
 
-  const signalClass = classifySignal(score);
-  const entry = last.close;
+  if (srEval.passed) {
+    score += 10;
+  } else {
+    score -= 20;
+  }
+
+  score = clamp(score, 0, 100);
+
+  const signalClass = classifySignal(score, MIN_SCORE);
 
   if (!Array.isArray(state.signalLog)) {
     state.signalLog = [];
@@ -783,6 +1057,16 @@ async function processSymbol(symbol, state) {
     emaSlopePct,
     distToEma20,
     distToEma50,
+    nearestSupport: nearestSupport?.price ?? null,
+    nearestSupportStrength: nearestSupport?.strength ?? null,
+    nearestSupportTouches: nearestSupport?.touches ?? null,
+    nearestResistance: nearestResistance?.price ?? null,
+    nearestResistanceStrength: nearestResistance?.strength ?? null,
+    nearestResistanceTouches: nearestResistance?.touches ?? null,
+    srPassed: srEval.passed,
+    srReason: srEval.reason,
+    distanceToSupportAtr: srEval.distanceToSupportAtr ?? null,
+    distanceToResistanceAtr: srEval.distanceToResistanceAtr ?? null,
     executionAttempted: false,
     executionApproved: false,
     executionReason: null,
@@ -795,16 +1079,70 @@ async function processSymbol(symbol, state) {
 
   console.log(
     `[SIGNAL] ${symbol} ${TF} score=${score} class=${signalClass} ` +
-      `bullish=${bullish} pullback=${nearPullback} rsiBand=${rsiInBand} rsiUp=${rsiRising}`
+      `bullish=${bullish} pullback=${nearPullback} rsiBand=${rsiInBand} ` +
+      `rsiUp=${rsiRising} minScore=${MIN_SCORE} sr=${srEval.reason}`
   );
 
-  const shouldBuy = signalClass === "EXECUTABLE";
-
-  if (!shouldBuy) {
+  if (adx < MIN_ADX) {
+    console.log(
+      `[ADAPTIVE] ${symbol} blocked: adx ${round(adx, 2)} < minAdx ${MIN_ADX}`
+    );
+    saveState(state);
     return;
   }
 
-  const { side, sl, tp } = buildSignal({
+  if (REQUIRE_TREND && !isTrend) {
+    console.log(`[ADAPTIVE] ${symbol} blocked: requireTrend=true`);
+    saveState(state);
+    return;
+  }
+
+  if (REQUIRE_RANGE && !isRange) {
+    console.log(`[ADAPTIVE] ${symbol} blocked: requireRange=true`);
+    saveState(state);
+    return;
+  }
+
+  if (REQUIRE_NEAR_PULLBACK && !nearPullback) {
+    console.log(`[ADAPTIVE] ${symbol} blocked: requireNearPullback=true`);
+    saveState(state);
+    return;
+  }
+
+  if (REQUIRE_STACKED_EMA && !stackedEma) {
+    console.log(`[ADAPTIVE] ${symbol} blocked: requireStackedEma=true`);
+    saveState(state);
+    return;
+  }
+
+  if (REQUIRE_NEAR_EMA20 && !nearEma20) {
+    console.log(`[ADAPTIVE] ${symbol} blocked: requireNearEma20=true`);
+    saveState(state);
+    return;
+  }
+
+  if (REQUIRE_RSI_RISING && !rsiRising) {
+    console.log(`[ADAPTIVE] ${symbol} blocked: requireRsiRising=true`);
+    saveState(state);
+    return;
+  }
+
+  if (REQUIRE_SR && !srEval.passed) {
+    console.log(
+      `[SR] ${symbol} bloqueado: ${srEval.reason} support=${nearestSupport?.price ?? "-"} resistance=${nearestResistance?.price ?? "-"}`
+    );
+    saveState(state);
+    return;
+  }
+
+  const shouldBuy = signalClass === "EXECUTABLE" && score >= MIN_SCORE;
+
+  if (!shouldBuy) {
+    saveState(state);
+    return;
+  }
+
+  const { side, sl, tp: rawTp } = buildSignal({
     symbol,
     tf: TF,
     entry,
@@ -823,13 +1161,40 @@ async function processSymbol(symbol, state) {
     emaSlopePct,
   });
 
+  let tp = rawTp;
+  let tpCappedByResistance = false;
+
+  if (
+    nearestResistance &&
+    Number.isFinite(nearestResistance.price) &&
+    nearestResistance.price > entry &&
+    Number.isFinite(atr) &&
+    atr > 0
+  ) {
+    const cappedTp = round(
+      nearestResistance.price - atr * TP_RESISTANCE_BUFFER_ATR,
+      6
+    );
+
+    if (cappedTp > entry && cappedTp < tp) {
+      tp = cappedTp;
+      tpCappedByResistance = true;
+    }
+  }
+
   const risk = Math.abs(entry - sl);
   const reward = Math.abs(tp - entry);
 
   if (risk === 0 || reward === 0) {
     console.log(`[CORE] ${symbol} risco/reward inválido — ignorado.`);
+    saveState(state);
     return;
   }
+
+  const currentStrategyConfig = loadRuntimeConfig();
+  const allowedSymbols = Object.keys(currentStrategyConfig).filter(
+    (s) => currentStrategyConfig[s]?.ENABLED
+  );
 
   const lastSignalForKey = state.lastSignal[keyFor(symbol, TF)];
   const entryDiffPct =
@@ -844,6 +1209,8 @@ async function processSymbol(symbol, state) {
     entry,
     sl,
     tp,
+    tpRawAtr: rawTp,
+    tpCappedByResistance,
     ts: Date.now(),
     signalTs: Date.now(),
     ema20,
@@ -868,8 +1235,19 @@ async function processSymbol(symbol, state) {
     isRange,
     emaSeparationPct,
     emaSlopePct,
+    nearestSupport: nearestSupport?.price ?? null,
+    nearestSupportStrength: nearestSupport?.strength ?? null,
+    nearestSupportTouches: nearestSupport?.touches ?? null,
+    nearestResistance: nearestResistance?.price ?? null,
+    nearestResistanceStrength: nearestResistance?.strength ?? null,
+    nearestResistanceTouches: nearestResistance?.touches ?? null,
+    srPassed: srEval.passed,
+    srReason: srEval.reason,
+    distanceToSupportAtr: srEval.distanceToSupportAtr ?? null,
+    distanceToResistanceAtr: srEval.distanceToResistanceAtr ?? null,
     cooldownPassed:
-      (Date.now() - (state.lastSignal[keyFor(symbol, TF)]?.ts || 0)) / 60000 >=
+      (Date.now() - (state.lastSignal[keyFor(symbol, TF)]?.ts || 0)) /
+        60000 >=
       COOLDOWN_MINS,
     entryDiffPctFromLast: entryDiffPct,
     maxHighDuringTrade: entry,
@@ -884,19 +1262,20 @@ async function processSymbol(symbol, state) {
 
   if (!shouldSendSignal(state, signalObj, COOLDOWN_MINS)) {
     console.log(`[CORE] ${symbol} sinal repetido/cooldown — ignorado.`);
+    saveState(state);
     return;
   }
 
   console.log(
-    `[EXECUTOR_CALL] ${symbol} class=${signalClass} score=${score} entry=${entry}`
+    `[EXECUTOR_CALL] ${symbol} class=${signalClass} score=${score} entry=${entry} tp=${tp} rawTp=${rawTp} capped=${tpCappedByResistance}`
   );
 
   const execResult = await paperExecute(signalObj, state, {
-    minScore: PAPER_MIN_SCORE,
+    minScore: MIN_SCORE,
     allowedClasses: ["EXECUTABLE"],
     maxOpenTradesTotal: PAPER_MAX_OPEN_TRADES_TOTAL,
     maxOpenTradesPerSymbol: PAPER_MAX_OPEN_TRADES_PER_SYMBOL,
-    allowedSymbols: SYMBOLS,
+    allowedSymbols,
   });
 
   if (execResult.executed) {
@@ -965,8 +1344,11 @@ async function processSymbol(symbol, state) {
 
 async function main() {
   const state = loadState();
+  const enabledSymbols = getEnabledSymbols();
 
-  for (const symbol of SYMBOLS) {
+  console.log(`[CORE] enabled symbols: ${enabledSymbols.join(", ") || "none"}`);
+
+  for (const symbol of enabledSymbols) {
     try {
       await processSymbol(symbol, state);
     } catch (err) {

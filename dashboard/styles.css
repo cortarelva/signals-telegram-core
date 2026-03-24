@@ -292,3 +292,18 @@ canvas {
     flex-direction: column;
   }
 }
+
+  .sell-btn {
+    background: #b91c1c;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .sell-btn:hover {
+    background: #dc2626;
+  }

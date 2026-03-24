@@ -8,6 +8,7 @@ const { canExecute } = require("./risk-manager");
 
 const ORDERS_LOG_FILE = path.join(__dirname, "orders-log.json");
 const METRICS_FILE = path.join(__dirname, "execution-metrics.json");
+const ADAPTIVE_CONFIG_FILE = path.join(__dirname, "runtime", "adaptive-config.json");
 
 const ACCOUNT_SIZE = Number(process.env.ACCOUNT_SIZE || 1000);
 const RISK_PER_TRADE = Number(process.env.RISK_PER_TRADE || 0.01);
@@ -40,6 +41,16 @@ const binance = new Binance().options({
 });
 
 const filtersCache = new Map();
+
+/* -------------------- adaptive config -------------------- */
+
+function loadAdaptiveConfig() {
+  try {
+    return JSON.parse(fs.readFileSync(ADAPTIVE_CONFIG_FILE, "utf8"));
+  } catch {
+    return { symbols: {}, global: {} };
+  }
+}
 
 /* -------------------- retry -------------------- */
 
@@ -114,14 +125,18 @@ function recordExecutionMetric(metric) {
   saveMetrics(metrics);
 }
 
-function computeAdaptiveSlippage() {
+function computeAdaptiveSlippage(symbol = null) {
   const metrics = loadMetrics();
 
-  if (metrics.length < 20) {
+  const filtered = symbol
+    ? metrics.filter((m) => m.symbol === symbol)
+    : metrics;
+
+  if (filtered.length < 20) {
     return MAX_SLIPPAGE_PCT;
   }
 
-  const values = metrics
+  const values = filtered
     .map((m) => m.slippagePct)
     .filter((v) => Number.isFinite(v))
     .sort((a, b) => a - b);
@@ -160,6 +175,37 @@ function getBaseAsset(symbol) {
   const quote = getQuoteAsset(symbol);
   if (!quote) return symbol;
   return symbol.replace(quote, "");
+}
+
+function getNetBaseQtyFromFills(fills, executedQty, symbol) {
+  const baseAsset = getBaseAsset(symbol);
+  const grossQty = Number(executedQty || 0);
+
+  if (!Array.isArray(fills) || !fills.length) {
+    return grossQty;
+  }
+
+  let baseCommission = 0;
+
+  for (const fill of fills) {
+    if (fill.commissionAsset === baseAsset) {
+      baseCommission += Number(fill.commission || 0);
+    }
+  }
+
+  const netQty = grossQty - baseCommission;
+  return netQty > 0 ? netQty : grossQty;
+}
+
+async function getMarketPrice(symbol) {
+  const ticker = await withRetry(() => binance.prices(symbol), `ticker ${symbol}`);
+  const price = Number(ticker[symbol]);
+
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new Error(`ticker inválido para ${symbol}`);
+  }
+
+  return price;
 }
 
 /* -------------------- balances -------------------- */
@@ -261,7 +307,15 @@ async function checkSlippage(symbol, entry) {
   const ticker = await withRetry(() => binance.prices(symbol), `ticker ${symbol}`);
   const price = Number(ticker[symbol]);
   const diff = Math.abs(price - entry) / entry;
-  const allowed = computeAdaptiveSlippage();
+
+  const adaptiveConfig = loadAdaptiveConfig();
+  const adaptiveSymbol = adaptiveConfig?.symbols?.[symbol];
+  const adaptiveGlobal = adaptiveConfig?.global || {};
+
+  const allowed =
+    adaptiveSymbol?.maxAllowedSlippagePct ??
+    adaptiveGlobal?.maxAllowedSlippagePct ??
+    computeAdaptiveSlippage(symbol);
 
   if (!Number.isFinite(price) || price <= 0) {
     throw new Error(`ticker inválido para ${symbol}`);
@@ -310,6 +364,8 @@ function calculatePositionSize(entry, sl) {
   };
 }
 
+/* -------------------- POSITION SIZE REVERTIDO -------------------- */
+
 function calculatePositionSizeFromBalance(entry, freeQuote) {
   if (!Number.isFinite(entry) || entry <= 0) {
     return {
@@ -339,6 +395,10 @@ function calculatePositionSizeFromBalance(entry, freeQuote) {
 
   const maxAllowedUsd = safeFreeQuote * MAX_TRADE_PERCENT_OF_FREE;
   tradeUsd = Math.min(tradeUsd, maxAllowedUsd);
+
+  if (Number.isFinite(MAX_POSITION_USD) && MAX_POSITION_USD > 0) {
+    tradeUsd = Math.min(tradeUsd, MAX_POSITION_USD);
+  }
 
   if (tradeUsd <= 0) {
     return {
@@ -436,6 +496,10 @@ async function placeRealMarketBuy(signalObj) {
     throw new Error("BINANCE_API_KEY / BINANCE_API_SECRET em falta");
   }
 
+  const adaptiveConfig = loadAdaptiveConfig();
+  const adaptiveSymbol = adaptiveConfig?.symbols?.[signalObj.symbol];
+  const adaptiveGlobal = adaptiveConfig?.global || {};
+
   const signalTs = Date.now();
   const filters = await initFilters(signalObj.symbol);
 
@@ -482,14 +546,28 @@ async function placeRealMarketBuy(signalObj) {
   const orderSentTs = Date.now();
 
   if (EXECUTION_MODE === "binance_test" && BINANCE_USE_TEST_ORDER) {
+    const testOrderFn =
+      typeof binance.testOrder === "function"
+        ? () =>
+            binance.testOrder({
+              symbol: signalObj.symbol,
+              side: "BUY",
+              type: "MARKET",
+              quantity: adjusted.qty,
+            })
+        : typeof binance.orderTest === "function"
+        ? () =>
+            binance.orderTest("BUY", signalObj.symbol, adjusted.qty, false, {
+              type: "MARKET",
+            })
+        : null;
+
+    if (!testOrderFn) {
+      throw new Error("binance test order function not available");
+    }
+
     await withRetry(
-      () =>
-        binance.testOrder({
-          symbol: signalObj.symbol,
-          side: "BUY",
-          type: "MARKET",
-          quantity: adjusted.qty,
-        }),
+      testOrderFn,
       `testOrder BUY ${signalObj.symbol}`
     );
 
@@ -525,15 +603,36 @@ async function placeRealMarketBuy(signalObj) {
   );
 
   const fillTs = Date.now();
-  const executedQty = Number(data.executedQty || adjusted.qty);
-  const quoteQty = Number(data.cummulativeQuoteQty || executedQty * adjusted.price);
+  const grossExecutedQty = Number(data.executedQty || adjusted.qty);
+  const netExecutedQty = getNetBaseQtyFromFills(
+    data.fills ?? [],
+    grossExecutedQty,
+    signalObj.symbol
+  );
+
+  const quoteQty = Number(
+    data.cummulativeQuoteQty || grossExecutedQty * adjusted.price
+  );
+
   const avgEntryPrice =
-    executedQty > 0 ? quoteQty / executedQty : Number(signalObj.entry);
+    grossExecutedQty > 0 ? quoteQty / grossExecutedQty : Number(signalObj.entry);
 
   const latencyInternal = orderSentTs - signalTs;
   const latencyExchange = fillTs - orderSentTs;
   const latencyTotal = fillTs - signalTs;
   const slippagePct = Math.abs(avgEntryPrice - signalObj.entry) / signalObj.entry;
+
+  const maxAllowedLatencyMs =
+    adaptiveSymbol?.maxAllowedLatencyMs ??
+    adaptiveGlobal?.maxAllowedLatencyMs ??
+    null;
+
+  if (
+    Number.isFinite(maxAllowedLatencyMs) &&
+    latencyTotal > Number(maxAllowedLatencyMs)
+  ) {
+    throw new Error(`latency too high ${latencyTotal} allowed ${maxAllowedLatencyMs}`);
+  }
 
   console.log(
     `[LATENCY] ${signalObj.symbol} internal=${latencyInternal}ms exchange=${latencyExchange}ms total=${latencyTotal}ms slippage=${(slippagePct * 100).toFixed(3)}%`
@@ -553,7 +652,8 @@ async function placeRealMarketBuy(signalObj) {
   const order = buildExecution(signalObj, {
     mode: "binance_real",
     sizing: {
-      quantity: executedQty,
+      quantity: round(netExecutedQty, 8),
+      grossQuantity: round(grossExecutedQty, 8),
       positionUsd: round(quoteQty, 2),
       tradeUsd: round(quoteQty, 2),
       freeQuote: round(freeQuote, 2),
@@ -565,16 +665,165 @@ async function placeRealMarketBuy(signalObj) {
       entryTransactTime: data.transactTime ?? null,
       entryStatus: data.status ?? null,
       entryExecutedQty: data.executedQty ?? null,
+      entryNetExecutedQty: round(netExecutedQty, 8),
       entryQuoteQty: data.cummulativeQuoteQty ?? null,
       entryFills: data.fills ?? [],
     },
   });
 
+  order.quantity = round(netExecutedQty, 8);
+  order.grossQuantity = round(grossExecutedQty, 8);
+  order.positionUsd = round(quoteQty, 2);
+  order.tradeUsd = round(quoteQty, 2);
+  order.freeQuote = round(freeQuote, 2);
   order.entry = round(avgEntryPrice, 8);
 
   return {
     mode: "binance_real",
     order,
+  };
+}
+
+/* -------------------- manual close by id -------------------- */
+
+async function forceCloseExecutionById(state, executionId) {
+  if (!state || !Array.isArray(state.executions)) {
+    return { ok: false, reason: "invalid_state" };
+  }
+
+  const exec = state.executions.find(
+    (e) => String(e.id) === String(executionId)
+  );
+
+  if (!exec) {
+    return { ok: false, reason: "execution_not_found" };
+  }
+
+  if (exec.status !== "OPEN") {
+    return { ok: false, reason: "execution_not_open" };
+  }
+
+  if (exec.mode === "paper" || exec.mode === "binance_test") {
+    const price = await getMarketPrice(exec.symbol);
+
+    exec.status = "CLOSED";
+    exec.closedTs = Date.now();
+    exec.closeReason = "MANUAL_MARKET_SELL";
+    exec.outcome = "MANUAL_MARKET_SELL";
+    exec.exitPrice = round(price, 8);
+
+    exec.pnlPct =
+      Number.isFinite(exec.entry) && exec.entry > 0
+        ? ((exec.exitPrice - exec.entry) / exec.entry) * 100
+        : 0;
+
+    appendOrderLog({
+      ts: Date.now(),
+      type: "manual_sell_close",
+      symbol: exec.symbol,
+      side: "SELL",
+      quantity: Number(exec.quantity || 0),
+      exitPrice: exec.exitPrice,
+      pnlPct: exec.pnlPct,
+      closeReason: exec.closeReason,
+      linkedExecutionId: exec.id,
+      mode: exec.mode,
+    });
+
+    if (Array.isArray(state.openSignals)) {
+      state.openSignals = state.openSignals.filter(
+        (s) => !(s.symbol === exec.symbol && s.tf === exec.tf && s.ts === exec.signalTs)
+      );
+    }
+
+    return {
+      ok: true,
+      reason: "manual_close_done",
+      executionId: exec.id,
+      symbol: exec.symbol,
+      exitPrice: exec.exitPrice,
+      pnlPct: exec.pnlPct,
+      mode: exec.mode,
+    };
+  }
+
+  const baseAsset = getBaseAsset(exec.symbol);
+  const freeBase = await getFreeAsset(baseAsset);
+
+  let sellQty = Math.min(Number(exec.quantity || 0), freeBase);
+
+  const filters = await initFilters(exec.symbol);
+  sellQty = roundToStep(sellQty, filters.stepSize);
+  sellQty = parseFloat(sellQty.toFixed(8));
+
+  if (!sellQty || sellQty <= 0) {
+    throw new Error(
+      `Sem saldo disponível para fechar ${exec.symbol}: free=${freeBase}, qty=${exec.quantity}`
+    );
+  }
+
+  const sellData = await withRetry(
+    () => binance.marketSell(exec.symbol, sellQty),
+    `manual marketSell ${exec.symbol}`
+  );
+
+  const soldQty = Number(sellData.executedQty || sellQty);
+  const quoteQty = Number(sellData.cummulativeQuoteQty || 0);
+  const avgExitPrice =
+    soldQty > 0 && quoteQty > 0 ? quoteQty / soldQty : Number(exec.entry);
+  const residualQty = Math.max(0, Number(exec.quantity || 0) - soldQty);
+
+  exec.status = "CLOSED";
+  exec.closedTs = Date.now();
+  exec.closeReason = "MANUAL_MARKET_SELL";
+  exec.outcome = "MANUAL_MARKET_SELL";
+  exec.exitPrice = round(avgExitPrice, 8);
+
+  exec.pnlPct =
+    Number.isFinite(exec.entry) && exec.entry > 0
+      ? ((exec.exitPrice - exec.entry) / exec.entry) * 100
+      : 0;
+
+  exec.exchange = {
+    ...(exec.exchange || {}),
+    exitOrderId: sellData.orderId ?? null,
+    exitClientOrderId: sellData.clientOrderId ?? null,
+    exitTransactTime: sellData.transactTime ?? null,
+    exitStatus: sellData.status ?? null,
+    exitExecutedQty: sellData.executedQty ?? null,
+    exitQuoteQty: sellData.cummulativeQuoteQty ?? null,
+    exitFills: sellData.fills ?? [],
+    exitResidualQty: round(residualQty, 8),
+    exitFreeBaseAtClose: round(freeBase, 8),
+  };
+
+  appendOrderLog({
+    ts: Date.now(),
+    type: "manual_sell_close",
+    symbol: exec.symbol,
+    side: "SELL",
+    quantity: soldQty,
+    exitPrice: exec.exitPrice,
+    pnlPct: exec.pnlPct,
+    closeReason: exec.closeReason,
+    linkedExecutionId: exec.id,
+    exchange: exec.exchange,
+  });
+
+  if (Array.isArray(state.openSignals)) {
+    state.openSignals = state.openSignals.filter(
+      (s) => !(s.symbol === exec.symbol && s.tf === exec.tf && s.ts === exec.signalTs)
+    );
+  }
+
+  return {
+    ok: true,
+    reason: "manual_close_done",
+    executionId: exec.id,
+    symbol: exec.symbol,
+    exitPrice: exec.exitPrice,
+    pnlPct: exec.pnlPct,
+    mode: exec.mode,
   };
 }
 
@@ -671,6 +920,7 @@ async function closeExecutionForSignal(state, closedSignal) {
   const quoteQty = Number(sellData.cummulativeQuoteQty || 0);
   const avgExitPrice =
     soldQty > 0 && quoteQty > 0 ? quoteQty / soldQty : Number(exec.entry);
+  const residualQty = Math.max(0, Number(exec.quantity || 0) - soldQty);
 
   exec.status = "CLOSED";
   exec.closedTs = closedSignal.closedTs || Date.now();
@@ -692,6 +942,8 @@ async function closeExecutionForSignal(state, closedSignal) {
     exitExecutedQty: sellData.executedQty ?? null,
     exitQuoteQty: sellData.cummulativeQuoteQty ?? null,
     exitFills: sellData.fills ?? [],
+    exitResidualQty: round(residualQty, 8),
+    exitFreeBaseAtClose: round(freeBase, 8),
   };
 
   appendOrderLog({
@@ -713,6 +965,17 @@ async function closeExecutionForSignal(state, closedSignal) {
 /* -------------------- main executor -------------------- */
 
 async function paperExecute(signalObj, state, options = {}) {
+  const adaptiveConfig = loadAdaptiveConfig();
+  const adaptiveSymbol = adaptiveConfig?.symbols?.[signalObj.symbol];
+
+  if (adaptiveSymbol?.enabled === false) {
+    return {
+      ok: false,
+      executed: false,
+      reason: "adaptive_symbol_disabled",
+    };
+  }
+
   const defaults = {
     minScore: 70,
     allowedClasses: ["EXECUTABLE"],
@@ -768,4 +1031,5 @@ async function paperExecute(signalObj, state, options = {}) {
 module.exports = {
   paperExecute,
   closeExecutionForSignal,
+  forceCloseExecutionById,
 };

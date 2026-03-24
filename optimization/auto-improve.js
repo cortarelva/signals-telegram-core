@@ -76,7 +76,7 @@ function backupFile(path) {
 function main() {
   console.log("=== AUTO IMPROVE START ===");
 
-  const baselineOutput = run("node backtest-bot.js");
+  const baselineOutput = run("node research/backtest-bot.js");
   console.log("\n=== BASELINE BACKTEST ===\n");
   console.log(baselineOutput);
 
@@ -89,7 +89,7 @@ function main() {
     return;
   }
 
-  const optimizeOutput = run("node optimize-strategy.js");
+  const optimizeOutput = run("node optimization/optimize-strategy.js");
   console.log("\n=== OPTIMIZER OUTPUT ===\n");
   console.log(optimizeOutput);
 
@@ -137,7 +137,7 @@ function main() {
   };
 
   fs.writeFileSync(
-    "improvement-log.jsonl",
+    "optimization/improvement-log.json",
     JSON.stringify(logEntry) + "\n",
     { flag: "a" }
   );

@@ -2,6 +2,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { getAccountSnapshot } = require("./binance-account");
+const { forceCloseExecutionById } = require("./paper-executor");
 
 const PORT = process.env.DASHBOARD_PORT || 3000;
 
@@ -465,6 +466,73 @@ const server = http.createServer(async (req, res) => {
           {
             error: err.body || err.message || String(err),
           },
+          null,
+          2
+        )
+      );
+      return;
+    }
+  }
+
+  if (req.method === "POST" && req.url === "/api/market-sell") {
+    try {
+      let body = "";
+
+      req.on("data", (chunk) => {
+        body += chunk.toString();
+      });
+
+      req.on("end", async () => {
+        try {
+          const parsed = body ? JSON.parse(body) : {};
+          const executionId = parsed.executionId;
+
+          if (!executionId) {
+            res.writeHead(400, {
+              "Content-Type": "application/json; charset=utf-8",
+            });
+            res.end(JSON.stringify({ ok: false, error: "executionId missing" }));
+            return;
+          }
+
+          const state = readJsonSafe(STATE_FILE, {
+            openSignals: [],
+            closedSignals: [],
+            signalLog: [],
+            executions: [],
+            lastSignal: {},
+          });
+
+          const result = await forceCloseExecutionById(state, executionId);
+          writeJsonSafe(STATE_FILE, state);
+
+          res.writeHead(200, {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "no-store",
+          });
+          res.end(JSON.stringify(result, null, 2));
+        } catch (err) {
+          res.writeHead(500, {
+            "Content-Type": "application/json; charset=utf-8",
+          });
+          res.end(
+            JSON.stringify(
+              { ok: false, error: err.body || err.message || String(err) },
+              null,
+              2
+            )
+          );
+        }
+      });
+
+      return;
+    } catch (err) {
+      res.writeHead(500, {
+        "Content-Type": "application/json; charset=utf-8",
+      });
+      res.end(
+        JSON.stringify(
+          { ok: false, error: err.body || err.message || String(err) },
           null,
           2
         )

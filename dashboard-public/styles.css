@@ -1,0 +1,29 @@
+body {
+  background: #0f1117;
+  color: white;
+  font-family: Arial;
+  padding: 20px;
+}
+
+.cards {
+  display: flex;
+  gap: 20px;
+}
+
+.card {
+  background: #1c1f26;
+  padding: 20px;
+  border-radius: 10px;
+  width: 200px;
+}
+
+table {
+  width: 100%;
+  margin-top: 10px;
+  border-collapse: collapse;
+}
+
+td {
+  border-bottom: 1px solid #333;
+  padding: 8px;
+}

@@ -3,7 +3,7 @@ const path = require("path");
 const { execFileSync } = require("child_process");
 
 const PID_FILE = path.join(__dirname, "bot.pid");
-const BOT_LOOP_PATTERN = "runtime/run-bot-loop.sh|runtime/signals-telegram-core.js";
+const BOT_LOOP_PATTERN = "runtime/run-bot-loop.sh|runtime/torus-ai-trading.js";
 
 function stopPid(pid) {
   try {

@@ -35,7 +35,7 @@ Essas tarefas pertencem à skill `signals_bot_lab`.
 
 ## Ficheiros principais
 
-- signals-telegram-core.js
+- torus-ai-trading.js
 - state.json
 - package.json
 - .env
@@ -87,7 +87,7 @@ Sempre seguir esta ordem antes de mexer no bot:
 
 2) Confirmar ficheiros essenciais
 - package.json
-- signals-telegram-core.js
+- torus-ai-trading.js
 - state.json
 - .env
 

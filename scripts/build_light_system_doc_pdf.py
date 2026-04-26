@@ -21,7 +21,7 @@ from reportlab.platypus import (
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = ROOT / "output" / "pdf"
-OUTPUT_FILE = OUTPUT_DIR / "signals-system-overview-pt.pdf"
+OUTPUT_FILE = OUTPUT_DIR / "torus-ai-trading-system-overview-pt.pdf"
 DB_PATH = ROOT / "runtime" / "runtime-store.sqlite"
 
 
@@ -136,7 +136,7 @@ def build_area_table():
         [
             p("<b>Runtime</b>", "Small"),
             p("Motor live, gestão de risco, estado, execução e espelho SQLite.", "Small"),
-            p("`runtime/` com `signals-telegram-core.js`, `futures-executor.js`, `risk-manager.js`, `state.json`, `orders-log.json`, `runtime-store.sqlite` e `config/`.", "Small"),
+            p("`runtime/` com `torus-ai-trading.js`, `futures-executor.js`, `risk-manager.js`, `state.json`, `orders-log.json`, `runtime-store.sqlite` e `config/`.", "Small"),
         ],
         [
             p("<b>Estratégias</b>", "Small"),
@@ -228,7 +228,7 @@ def add_page_number(canvas, doc):
     canvas.setFont(BASE_FONT, 8)
     canvas.setFillColor(colors.HexColor("#64748B"))
     canvas.drawRightString(195 * mm, 10 * mm, f"Página {page}")
-    canvas.drawString(15 * mm, 10 * mm, "Signals Telegram Core - Futures")
+    canvas.drawString(15 * mm, 10 * mm, "TorusAiTrading")
 
 
 def build_story():
@@ -239,7 +239,7 @@ def build_story():
         [
             Spacer(1, 22 * mm),
             p("Visão Geral do Sistema", "DocTitle"),
-            p("Signals Telegram Core - Futures", "DocSubTitle"),
+            p("TorusAiTrading", "DocSubTitle"),
             p(
                 "Documento leve de referência para operação, manutenção e leitura rápida do projeto.",
                 "DocSubTitle",

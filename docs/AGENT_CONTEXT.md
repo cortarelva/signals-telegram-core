@@ -31,6 +31,6 @@ Workflow típico:
 4) propor melhoria
 
 5) após aprovação humana
-   alterar signals-telegram-core.js
+   alterar torus-ai-trading.js
 
 6) reiniciar bot

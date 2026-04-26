@@ -9,12 +9,12 @@ Scope:
 - window: `2025-04-26 -> 2026-04-26`
 
 Artifacts:
-- [`base-management.json`](/Users/joel/Documents/CoddingStuff/signals-telegram-core%20-%20futures/research/eth-cipher-short-1h-management-sweep/base-management.json)
-- [`be040-lock002.json`](/Users/joel/Documents/CoddingStuff/signals-telegram-core%20-%20futures/research/eth-cipher-short-1h-management-sweep/be040-lock002.json)
-- [`be040-lock002-tp090.json`](/Users/joel/Documents/CoddingStuff/signals-telegram-core%20-%20futures/research/eth-cipher-short-1h-management-sweep/be040-lock002-tp090.json)
-- [`be035-lock002-tp090.json`](/Users/joel/Documents/CoddingStuff/signals-telegram-core%20-%20futures/research/eth-cipher-short-1h-management-sweep/be035-lock002-tp090.json)
-- [`be030-lock002.json`](/Users/joel/Documents/CoddingStuff/signals-telegram-core%20-%20futures/research/eth-cipher-short-1h-management-sweep/be030-lock002.json)
-- [`be030-lock002-tp090.json`](/Users/joel/Documents/CoddingStuff/signals-telegram-core%20-%20futures/research/eth-cipher-short-1h-management-sweep/be030-lock002-tp090.json)
+- [`base-management.json`](/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/eth-cipher-short-1h-management-sweep/base-management.json)
+- [`be040-lock002.json`](/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/eth-cipher-short-1h-management-sweep/be040-lock002.json)
+- [`be040-lock002-tp090.json`](/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/eth-cipher-short-1h-management-sweep/be040-lock002-tp090.json)
+- [`be035-lock002-tp090.json`](/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/eth-cipher-short-1h-management-sweep/be035-lock002-tp090.json)
+- [`be030-lock002.json`](/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/eth-cipher-short-1h-management-sweep/be030-lock002.json)
+- [`be030-lock002-tp090.json`](/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/eth-cipher-short-1h-management-sweep/be030-lock002-tp090.json)
 
 ## Summary
 

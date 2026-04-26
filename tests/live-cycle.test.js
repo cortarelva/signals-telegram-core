@@ -21,10 +21,10 @@ function loadFreshCoreAndExecutor() {
   );
 
   delete require.cache[require.resolve("../runtime/futures-executor")];
-  delete require.cache[require.resolve("../runtime/signals-telegram-core")];
+  delete require.cache[require.resolve("../runtime/torus-ai-trading")];
 
   const executor = require("../runtime/futures-executor");
-  const core = require("../runtime/signals-telegram-core");
+  const core = require("../runtime/torus-ai-trading");
 
   return { executor, core };
 }
@@ -211,10 +211,10 @@ test("binance-real tracker updates attached stop on exchange when break-even tri
   );
 
   delete require.cache[require.resolve("../runtime/futures-executor")];
-  delete require.cache[require.resolve("../runtime/signals-telegram-core")];
+  delete require.cache[require.resolve("../runtime/torus-ai-trading")];
 
   const executor = require("../runtime/futures-executor");
-  const core = require("../runtime/signals-telegram-core");
+  const core = require("../runtime/torus-ai-trading");
   const calls = [];
 
   executor.moveExecutionStopToBreakEven = async (execution, newStopPrice, meta) => {

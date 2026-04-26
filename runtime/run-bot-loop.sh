@@ -31,7 +31,7 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S %Z')] bot loop started pid=$$ interval=${LOOP_
 
 while true; do
   echo "[$(date '+%Y-%m-%d %H:%M:%S %Z')] bot cycle start"
-  node "$ROOT_DIR/runtime/signals-telegram-core.js"
+  node "$ROOT_DIR/runtime/torus-ai-trading.js"
   rc=$?
   echo "[$(date '+%Y-%m-%d %H:%M:%S %Z')] bot cycle end rc=$rc"
   sleep "$LOOP_SLEEP_SECS"

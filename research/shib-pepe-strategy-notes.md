@@ -9,10 +9,10 @@ Confirmed Binance Futures symbols used for this research:
 
 ## Base Runs
 
-- [`/Users/joel/Documents/CoddingStuff/signals-telegram-core - futures/research/shib-pepe-all-strategies-5m.json`](/Users/joel/Documents/CoddingStuff/signals-telegram-core%20-%20futures/research/shib-pepe-all-strategies-5m.json)
-- [`/Users/joel/Documents/CoddingStuff/signals-telegram-core - futures/research/shib-pepe-all-strategies-15m.json`](/Users/joel/Documents/CoddingStuff/signals-telegram-core%20-%20futures/research/shib-pepe-all-strategies-15m.json)
-- [`/Users/joel/Documents/CoddingStuff/signals-telegram-core - futures/research/shib-pepe-all-strategies-1h.json`](/Users/joel/Documents/CoddingStuff/signals-telegram-core%20-%20futures/research/shib-pepe-all-strategies-1h.json)
-- [`/Users/joel/Documents/CoddingStuff/signals-telegram-core - futures/research/shib-pepe-1h-focus.json`](/Users/joel/Documents/CoddingStuff/signals-telegram-core%20-%20futures/research/shib-pepe-1h-focus.json)
+- [`/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/shib-pepe-all-strategies-5m.json`](/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/shib-pepe-all-strategies-5m.json)
+- [`/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/shib-pepe-all-strategies-15m.json`](/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/shib-pepe-all-strategies-15m.json)
+- [`/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/shib-pepe-all-strategies-1h.json`](/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/shib-pepe-all-strategies-1h.json)
+- [`/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/shib-pepe-1h-focus.json`](/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/shib-pepe-1h-focus.json)
 
 ## Best Candidates
 

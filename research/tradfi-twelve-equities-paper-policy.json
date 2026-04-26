@@ -1,6 +1,6 @@
 {
   "generatedAt": "2026-04-26T00:05:44.260Z",
-  "sourceSummaryFile": "/Users/joel/Documents/CoddingStuff/signals-telegram-core - futures/research/meta-models-tradfi/equities_reversal_1h_1d_core/oversold-bounce-combined-summary.json",
+  "sourceSummaryFile": "/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/meta-models-tradfi/equities_reversal_1h_1d_core/oversold-bounce-combined-summary.json",
   "profileLabel": "equities_reversal_1h_1d_core",
   "strategy": "oversoldBounce",
   "thresholds": {
@@ -36,7 +36,7 @@
       "recall": 0.391304347826087,
       "f1": 0.391304347826087
     },
-    "modelFile": "/Users/joel/Documents/CoddingStuff/signals-telegram-core - futures/research/meta-models-tradfi/equities_reversal_1h_1d_core/oversold-bounce-meta-model.json"
+    "modelFile": "/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/meta-models-tradfi/equities_reversal_1h_1d_core/oversold-bounce-meta-model.json"
   },
   "symbols": {
     "AAPLUSDT": {
@@ -64,8 +64,8 @@
         "recall": 0.5555555555555556,
         "f1": 0.6250000000000001
       },
-      "modelFile": "/Users/joel/Documents/CoddingStuff/signals-telegram-core - futures/research/meta-models-tradfi/equities_reversal_1h_1d_core/by-symbol/aaplusdt/oversold-bounce-meta-model.json",
-      "fallbackModelFile": "/Users/joel/Documents/CoddingStuff/signals-telegram-core - futures/research/meta-models-tradfi/equities_reversal_1h_1d_core/oversold-bounce-meta-model.json",
+      "modelFile": "/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/meta-models-tradfi/equities_reversal_1h_1d_core/by-symbol/aaplusdt/oversold-bounce-meta-model.json",
+      "fallbackModelFile": "/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/meta-models-tradfi/equities_reversal_1h_1d_core/oversold-bounce-meta-model.json",
       "fallbackStatus": "available"
     },
     "QQQUSDT": {
@@ -93,8 +93,8 @@
         "recall": 0.42857142857142855,
         "f1": 0.42857142857142855
       },
-      "modelFile": "/Users/joel/Documents/CoddingStuff/signals-telegram-core - futures/research/meta-models-tradfi/equities_reversal_1h_1d_core/by-symbol/qqqusdt/oversold-bounce-meta-model.json",
-      "fallbackModelFile": "/Users/joel/Documents/CoddingStuff/signals-telegram-core - futures/research/meta-models-tradfi/equities_reversal_1h_1d_core/oversold-bounce-meta-model.json",
+      "modelFile": "/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/meta-models-tradfi/equities_reversal_1h_1d_core/by-symbol/qqqusdt/oversold-bounce-meta-model.json",
+      "fallbackModelFile": "/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/meta-models-tradfi/equities_reversal_1h_1d_core/oversold-bounce-meta-model.json",
       "fallbackStatus": "available"
     },
     "SPYUSDT": {
@@ -122,8 +122,8 @@
         "recall": 0.875,
         "f1": 0.6363636363636364
       },
-      "modelFile": "/Users/joel/Documents/CoddingStuff/signals-telegram-core - futures/research/meta-models-tradfi/equities_reversal_1h_1d_core/by-symbol/spyusdt/oversold-bounce-meta-model.json",
-      "fallbackModelFile": "/Users/joel/Documents/CoddingStuff/signals-telegram-core - futures/research/meta-models-tradfi/equities_reversal_1h_1d_core/oversold-bounce-meta-model.json",
+      "modelFile": "/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/meta-models-tradfi/equities_reversal_1h_1d_core/by-symbol/spyusdt/oversold-bounce-meta-model.json",
+      "fallbackModelFile": "/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/meta-models-tradfi/equities_reversal_1h_1d_core/oversold-bounce-meta-model.json",
       "fallbackStatus": "available"
     }
   }

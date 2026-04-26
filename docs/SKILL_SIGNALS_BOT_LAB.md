@@ -21,7 +21,7 @@ Nunca executar trades reais nem alterar parâmetros live sem confirmação human
 
 ## Bot live
 
-O ficheiro `signals-telegram-core.js` é o bot em produção.
+O ficheiro `torus-ai-trading.js` é o bot em produção.
 
 Regras para este ficheiro:
 
@@ -36,7 +36,7 @@ Se a mudança for grande, deve ser primeiro testada em `backtest-bot.js`.
 
 O projeto contém:
 
-- signals-telegram-core.js
+- torus-ai-trading.js
 - state.json
 - backfill-dataset.js
 - analyze-state.js

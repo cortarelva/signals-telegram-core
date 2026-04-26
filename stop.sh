@@ -5,7 +5,7 @@ set -u
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BOT_PID_FILE="$ROOT_DIR/bot.pid"
 DASHBOARD_PID_FILE="$ROOT_DIR/dashboard.pid"
-BOT_LOOP_PATTERN="runtime/run-bot-loop.sh|runtime/signals-telegram-core.js"
+BOT_LOOP_PATTERN="runtime/run-bot-loop.sh|runtime/torus-ai-trading.js"
 DASHBOARD_PATTERN="runtime/run-dashboard.sh|runtime/dashboard-server.js"
 
 find_running_pid() {

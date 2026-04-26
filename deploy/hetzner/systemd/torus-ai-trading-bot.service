@@ -1,0 +1,17 @@
+[Unit]
+Description=TorusAiTrading Bot Loop
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=torus
+WorkingDirectory=/opt/TorusAiTrading
+ExecStart=/usr/bin/bash /opt/TorusAiTrading/runtime/run-bot-loop.sh
+Restart=always
+RestartSec=10
+KillMode=control-group
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

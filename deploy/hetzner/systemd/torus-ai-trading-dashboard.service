@@ -1,0 +1,17 @@
+[Unit]
+Description=TorusAiTrading Dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=torus
+WorkingDirectory=/opt/TorusAiTrading
+ExecStart=/usr/bin/bash /opt/TorusAiTrading/runtime/run-dashboard.sh
+Restart=always
+RestartSec=10
+KillMode=control-group
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

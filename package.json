@@ -4,7 +4,7 @@
   "description": "",
   "main": "signals-telegram-core.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test tests/*.test.js",
     "run": "node runtime/signals-telegram-core.js",
     "loop": "while true; do node runtime/signals-telegram-core.js; sleep 60; done",
     "analyze": "node research/analyze-state.js",
@@ -20,15 +20,32 @@
     "dashboard": "node runtime/dashboard-server.js",
     "account": "node runtime/test-binance-account.js",
     "bot": "node runtime/signals-telegram-core.js",
-    "dashboard-public": "node runtime/dashboard-public-server.js"
+    "dashboard-public": "node runtime/dashboard-public-server.js",
+    "sqlite:bootstrap": "node runtime/bootstrap-sqlite-store.js",
+    "dataset:candidates": "node research/build-candidate-labeled-dataset.js",
+    "dataset:replay": "node research/build-historical-replay-dataset.js",
+    "train:meta": "node research/train-strategy-meta-models.js",
+    "backtest:tradfi": "node research/backtest-tradfi-candidates.js",
+    "optimize:tradfi": "node research/optimize-tradfi-preset.js",
+    "preset:tradfi-equities": "node research/build-tradfi-twelve-equities-preset.js",
+    "backtest:tradfi-equities": "node research/run-tradfi-twelve-equities-backtests.js",
+    "train:tradfi-meta": "node research/train-tradfi-meta-models.js",
+    "train:tradfi-meta:symbols": "TRADFI_META_SPLIT_BY_SYMBOL=1 node research/train-tradfi-meta-models.js",
+    "policy:tradfi-meta": "node research/build-tradfi-meta-policy.js",
+    "backtest:cipher-short": "BACKTEST_STRATEGIES=cipherContinuationShort node research/backtest-candidate-strategies.js",
+    "backtest:cipher-long": "BACKTEST_STRATEGIES=cipherContinuationLong node research/backtest-candidate-strategies.js",
+    "compare:real-vs-backtest": "node research/compare-real-vs-backtest.js",
+    "mine:opportunities": "node research/mine-opportunity-events.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "axios": "^1.13.5",
+    "csv-parse": "^6.2.1",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "ml-random-forest": "^2.1.0",
     "node-binance-api": "^1.0.22"
   }
 }

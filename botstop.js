@@ -1,9 +1,15 @@
 const fs = require("fs");
 const path = require("path");
+const { execFileSync } = require("child_process");
 
-const PID_FILE = path.join(__dirname, ".bot-pids.json");
+const PID_FILE = path.join(__dirname, "bot.pid");
+const BOT_LOOP_PATTERN = "runtime/run-bot-loop.sh|runtime/signals-telegram-core.js";
 
 function stopPid(pid) {
+  try {
+    execFileSync("pkill", ["-TERM", "-P", String(pid)], { stdio: "ignore" });
+  } catch {}
+
   try {
     process.kill(pid, "SIGTERM");
     return true;
@@ -13,31 +19,39 @@ function stopPid(pid) {
 }
 
 function main() {
-  if (!fs.existsSync(PID_FILE)) {
+  let pid = null;
+
+  try {
+    if (fs.existsSync(PID_FILE)) {
+      const fromFile = Number(fs.readFileSync(PID_FILE, "utf8"));
+      if (Number.isFinite(fromFile)) {
+        try {
+          process.kill(fromFile, 0);
+          pid = fromFile;
+        } catch {}
+      }
+    }
+  } catch {}
+
+  if (!pid) {
+    try {
+      const output = execFileSync("pgrep", ["-fo", BOT_LOOP_PATTERN], {
+        cwd: __dirname,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+      const fromPgrep = Number(String(output || "").trim().split("\n")[0]);
+      if (Number.isFinite(fromPgrep)) pid = fromPgrep;
+    } catch {}
+  }
+
+  if (!pid) {
     console.log("Não existe ficheiro de pids. Nada para parar.");
     return;
   }
 
-  let processes = [];
-
-  try {
-    processes = JSON.parse(fs.readFileSync(PID_FILE, "utf8"));
-  } catch {
-    console.log("Não foi possível ler o ficheiro de pids.");
-    return;
-  }
-
-  if (!Array.isArray(processes) || processes.length === 0) {
-    console.log("Sem processos registados.");
-    return;
-  }
-
-  console.log("A parar processos...");
-
-  for (const proc of processes) {
-    const ok = stopPid(proc.pid);
-    console.log(`- ${proc.name} (pid ${proc.pid}): ${ok ? "ok" : "já parado"}`);
-  }
+  const ok = stopPid(pid);
+  console.log(`- signals-loop (pid ${pid}): ${ok ? "STOPPED" : "já parado"}`);
 
   try {
     fs.unlinkSync(PID_FILE);

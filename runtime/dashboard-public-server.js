@@ -1,6 +1,7 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
+const { resolveTradeOutcome } = require("./trade-outcome");
 
 const app = express();
 const PORT = 3001;
@@ -25,6 +26,16 @@ function loadState() {
   }
 }
 
+function annotateTradeOutcome(record) {
+  const outcomeInfo = resolveTradeOutcome(record);
+  return {
+    ...record,
+    outcome: outcomeInfo.outcome,
+    outcomeTitle: outcomeInfo.title,
+    outcomeBucket: outcomeInfo.bucket,
+  };
+}
+
 function buildPublicState() {
   const state = loadState();
 
@@ -43,8 +54,9 @@ function buildPublicState() {
       equityHistory.push(equity);
     }
 
-    if (c.outcome === "TP") wins++;
-    if (c.outcome === "SL") losses++;
+    const outcomeInfo = resolveTradeOutcome(c);
+    if (outcomeInfo.bucket === "win") wins++;
+    if (outcomeInfo.bucket === "loss") losses++;
   }
 
   const winRate =
@@ -55,7 +67,7 @@ function buildPublicState() {
     profit: equity - 1000,
     winRate,
     openTrades: open.slice(-5),
-    recentClosed: closed.slice(-10),
+    recentClosed: closed.slice(-10).map(annotateTradeOutcome),
     equityHistory,
     timestamp: Date.now(),
   };

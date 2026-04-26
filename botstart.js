@@ -1,8 +1,9 @@
 const fs = require("fs");
 const path = require("path");
-const { spawn } = require("child_process");
+const { execFileSync, spawn } = require("child_process");
 
-const PID_FILE = path.join(__dirname, ".bot-pids.json");
+const PID_FILE = path.join(__dirname, "bot.pid");
+const BOT_LOOP_PATTERN = "runtime/run-bot-loop.sh|runtime/signals-telegram-core.js";
 
 function isRunning(pid) {
   try {
@@ -13,7 +14,28 @@ function isRunning(pid) {
   }
 }
 
-function startProcess(name, command, args) {
+function findExistingBotPid() {
+  try {
+    if (fs.existsSync(PID_FILE)) {
+      const pid = Number(fs.readFileSync(PID_FILE, "utf8"));
+      if (Number.isFinite(pid) && isRunning(pid)) return pid;
+    }
+  } catch {}
+
+  try {
+    const output = execFileSync("pgrep", ["-fo", BOT_LOOP_PATTERN], {
+      cwd: __dirname,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    const pid = Number(String(output || "").trim().split("\n")[0]);
+    if (Number.isFinite(pid) && isRunning(pid)) return pid;
+  } catch {}
+
+  return null;
+}
+
+function startProcess(command, args) {
   const child = spawn(command, args, {
     cwd: __dirname,
     detached: true,
@@ -22,50 +44,20 @@ function startProcess(name, command, args) {
 
   child.unref();
 
-  return {
-    name,
-    pid: child.pid,
-    command,
-    args,
-    startedAt: Date.now(),
-  };
+  return child.pid;
 }
 
 function main() {
-  let existing = [];
-
-  try {
-    existing = JSON.parse(fs.readFileSync(PID_FILE, "utf8"));
-  } catch {
-    existing = [];
-  }
-
-  const stillRunning = existing.filter((p) => isRunning(p.pid));
-
-  if (stillRunning.length > 0) {
-    console.log("O bot já parece estar a correr:");
-    for (const proc of stillRunning) {
-      console.log(`- ${proc.name} (pid ${proc.pid})`);
-    }
+  const existingPid = findExistingBotPid();
+  if (existingPid) {
+    console.log(`- signals-loop (pid ${existingPid}): RUNNING`);
     return;
   }
 
-  const processes = [];
+  const pid = startProcess("bash", [path.join(__dirname, "runtime", "run-bot-loop.sh")]);
+  fs.writeFileSync(PID_FILE, String(pid), "utf8");
 
-  processes.push(
-    startProcess("signals-loop", "npm", ["run", "loop"])
-  );
-
-  processes.push(
-    startProcess("adaptive-loop", "node", ["scheduler/adaptive-loop.js"])
-  );
-
-  fs.writeFileSync(PID_FILE, JSON.stringify(processes, null, 2), "utf8");
-
-  console.log("Bot arrancado com sucesso:");
-  for (const proc of processes) {
-    console.log(`- ${proc.name} (pid ${proc.pid})`);
-  }
+  console.log(`- signals-loop (pid ${pid}): RUNNING`);
 }
 
 main();

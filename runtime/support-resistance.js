@@ -147,19 +147,88 @@ function evaluateTradeZone({
   resistance,
   minSpaceToTargetAtr = 0.8,
   maxDistanceFromSupportAtr = 1.2,
+  maxDistanceFromResistanceAtr = maxDistanceFromSupportAtr,
+  direction = "LONG",
 }) {
   if (!Number.isFinite(entry) || !Number.isFinite(atr) || atr <= 0) {
     return { passed: false, reason: "invalid_entry_or_atr" };
   }
 
-  if (!support) {
-    return { passed: false, reason: "no_support" };
-  }
+  const side = String(direction || "LONG").toUpperCase();
 
-  const distanceToSupportAtr = (entry - support.price) / atr;
+  const distanceToSupportAtr = support ? (entry - support.price) / atr : null;
   const distanceToResistanceAtr = resistance
     ? (resistance.price - entry) / atr
     : null;
+
+  if (side === "SHORT" || side === "SELL") {
+    if (!resistance) {
+      return {
+        passed: false,
+        reason: "no_resistance",
+        distanceToSupportAtr:
+          distanceToSupportAtr != null && Number.isFinite(distanceToSupportAtr)
+            ? round(distanceToSupportAtr, 4)
+            : null,
+        distanceToResistanceAtr: null,
+      };
+    }
+
+    if (distanceToResistanceAtr == null || !Number.isFinite(distanceToResistanceAtr)) {
+      return { passed: false, reason: "invalid_resistance_distance" };
+    }
+
+    if (distanceToResistanceAtr < 0) {
+      return {
+        passed: false,
+        reason: "entry_above_resistance",
+        distanceToSupportAtr:
+          distanceToSupportAtr != null && Number.isFinite(distanceToSupportAtr)
+            ? round(distanceToSupportAtr, 4)
+            : null,
+        distanceToResistanceAtr: round(distanceToResistanceAtr, 4),
+      };
+    }
+
+    if (distanceToResistanceAtr > maxDistanceFromResistanceAtr) {
+      return {
+        passed: false,
+        reason: "too_far_from_resistance",
+        distanceToSupportAtr:
+          distanceToSupportAtr != null && Number.isFinite(distanceToSupportAtr)
+            ? round(distanceToSupportAtr, 4)
+            : null,
+        distanceToResistanceAtr: round(distanceToResistanceAtr, 4),
+      };
+    }
+
+    if (
+      distanceToSupportAtr != null &&
+      Number.isFinite(distanceToSupportAtr) &&
+      distanceToSupportAtr < minSpaceToTargetAtr
+    ) {
+      return {
+        passed: false,
+        reason: "support_too_close",
+        distanceToSupportAtr: round(distanceToSupportAtr, 4),
+        distanceToResistanceAtr: round(distanceToResistanceAtr, 4),
+      };
+    }
+
+    return {
+      passed: true,
+      reason: "ok",
+      distanceToSupportAtr:
+        distanceToSupportAtr != null && Number.isFinite(distanceToSupportAtr)
+          ? round(distanceToSupportAtr, 4)
+          : null,
+      distanceToResistanceAtr: round(distanceToResistanceAtr, 4),
+    };
+  }
+
+  if (!support) {
+    return { passed: false, reason: "no_support" };
+  }
 
   if (distanceToSupportAtr < 0) {
     return {

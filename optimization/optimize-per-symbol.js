@@ -9,7 +9,7 @@ const SYMBOLS = [
   "SHIBUSDC",
 ]
 
-const TF = "5m"
+const TF = "3m"
 
 const RSI_MIN_VALUES = [30, 35, 38, 40, 42]
 const RSI_MAX_VALUES = [45, 48, 50, 52, 55]

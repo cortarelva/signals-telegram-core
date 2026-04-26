@@ -1,0 +1,98 @@
+{
+  "generatedAt": "2026-04-25T22:32:25.790Z",
+  "source": "Twelve Data equities research config",
+  "provider": "twelvedata",
+  "presetFile": "research/tradfi-twelve-equities-preset.json",
+  "recommendationsFile": "research/tradfi-twelve-equities-recommendations.json",
+  "paperPolicyFile": "research/tradfi-twelve-equities-paper-policy.json",
+  "profileCooldownSeconds": 65,
+  "profiles": [
+    {
+      "label": "equities_reversal_1h_1d_core",
+      "mode": "core",
+      "tf": "1h",
+      "htfTf": "1d",
+      "ltfLimit": 2200,
+      "htfLimit": 400,
+      "symbols": [
+        "AAPLUSDT",
+        "QQQUSDT",
+        "SPYUSDT"
+      ],
+      "strategies": [
+        "oversoldBounce"
+      ],
+      "configOverrides": {
+        "DEFAULTS": {
+          "OVERSOLD_BOUNCE": {
+            "enabled": true,
+            "minScore": 55,
+            "minAdx": 0,
+            "maxRsi": 50,
+            "minRsiRecovery": 0.5,
+            "minDropAtr": 0.8,
+            "minBullRecoveryBodyAtr": 0.06,
+            "minRelativeVolume": 0.9,
+            "requireVolume": false,
+            "slAtrMult": 1,
+            "tpAtrMult": 1.4,
+            "minRrAfterCap": 0.6,
+            "minTpPctAfterCap": 0.0007,
+            "minTpAtrAfterCap": 0.3
+          }
+        }
+      }
+    },
+    {
+      "label": "qqq_breakdown_short_30m_1d_core",
+      "mode": "core",
+      "tf": "30m",
+      "htfTf": "1d",
+      "ltfLimit": 2500,
+      "htfLimit": 400,
+      "symbols": [
+        "QQQUSDT"
+      ],
+      "strategies": [
+        "breakdownRetestShort"
+      ],
+      "configOverrides": {}
+    },
+    {
+      "label": "aapl_failed_breakdown_1h_1d_observe",
+      "mode": "observe",
+      "tf": "1h",
+      "htfTf": "1d",
+      "ltfLimit": 2200,
+      "htfLimit": 400,
+      "symbols": [
+        "AAPLUSDT"
+      ],
+      "strategies": [
+        "failedBreakdown"
+      ],
+      "configOverrides": {
+        "DEFAULTS": {
+          "FAILED_BREAKDOWN": {
+            "enabled": true,
+            "minScore": 58,
+            "minAdx": 0,
+            "maxAdx": 34,
+            "maxRsi": 60,
+            "minRsiRecovery": 0.35,
+            "minBreakAtr": 0.03,
+            "minRecoveryCloseAtr": 0.03,
+            "minBullBodyAtr": 0.05,
+            "minLowerWickAtr": 0.07,
+            "requireVolume": false,
+            "minRelativeVolume": 0.9,
+            "tpAtrMult": 1.45,
+            "minRrAfterCap": 0.6,
+            "minTpPctAfterCap": 0.0007,
+            "minTpAtrAfterCap": 0.3
+          }
+        }
+      }
+    }
+  ]
+}

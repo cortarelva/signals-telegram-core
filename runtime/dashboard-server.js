@@ -1,28 +1,70 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const { getAccountSnapshot } = require("./binance-account");
-const { forceCloseExecutionById } = require("./paper-executor");
+const { execFile } = require("child_process");
+const {
+  readJsonSafe: readJsonFileSafe,
+  writeJsonAtomic,
+} = require("./file-utils");
+const { resolveTradeOutcome } = require("./trade-outcome");
 
-const PORT = process.env.DASHBOARD_PORT || 3000;
+let getAccountSnapshot = async () => ({
+  snapshotType: "unknown",
+  balances: [],
+  openOrders: [],
+  positions: [],
+});
 
-const STATE_FILE = path.join(__dirname, "state.json");
+try {
+  const futuresAccount = require("./binance-futures-account");
+  getAccountSnapshot =
+    futuresAccount.getFuturesAccountSnapshot ||
+    futuresAccount.getAccountSnapshot ||
+    getAccountSnapshot;
+} catch {}
+
+try {
+  if (getAccountSnapshot.toString().includes('snapshotType: "unknown"')) {
+    const spotAccount = require("./binance-account");
+    getAccountSnapshot = spotAccount.getAccountSnapshot || getAccountSnapshot;
+  }
+} catch {}
+
+const { forceCloseExecutionById } = require("./futures-executor");
+
+const PORT = process.env.DASHBOARD_PORT || 3002;
+const DASHBOARD_HOST = process.env.DASHBOARD_HOST || "127.0.0.1";
+const PROJECT_ROOT = path.join(__dirname, "..");
+const STATE_FILE =
+  process.env.STATE_FILE_PATH || path.join(__dirname, "state.json");
 const BASE_CONFIG_FILE = path.join(__dirname, "strategy-config.json");
 const GENERATED_CONFIG_FILE = path.join(__dirname, "strategy-config.generated.json");
-const METRICS_FILE = path.join(__dirname, "execution-metrics.json");
+const METRICS_FILE =
+  process.env.EXECUTION_METRICS_FILE_PATH ||
+  path.join(__dirname, "execution-metrics.json");
+const ORDERS_LOG_FILE =
+  process.env.ORDERS_LOG_FILE_PATH || path.join(__dirname, "orders-log.json");
 const PERFORMANCE_BASELINE_FILE = path.join(__dirname, "performance-baseline.json");
+const ADAPTIVE_HISTORY_FILE = path.join(__dirname, "adaptive-history.json");
+const PID_FILE = path.join(__dirname, ".bot-pids.json");
+
+const RESEARCH_JSON_FILE = path.join(__dirname, "..", "research", "consolidated-trades.json");
+const RESEARCH_CSV_FILE = path.join(__dirname, "..", "research", "consolidated-trades.csv");
+
 const PUBLIC_DIR = path.join(__dirname, "..", "dashboard");
 
 function readJsonSafe(filePath, fallback) {
-  try {
-    return JSON.parse(fs.readFileSync(filePath, "utf8"));
-  } catch {
-    return fallback;
-  }
+  return readJsonFileSafe(filePath, fallback);
 }
 
 function writeJsonSafe(filePath, value) {
-  fs.writeFileSync(filePath, JSON.stringify(value, null, 2));
+  writeJsonAtomic(filePath, value);
+}
+
+function deleteIfExists(filePath) {
+  try {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  } catch {}
 }
 
 function buildMergedConfig(baseConfig, generatedConfig) {
@@ -121,9 +163,13 @@ function buildExecutionBreakdown(executions) {
     if (exec.status === "CLOSED") bucket.closed++;
 
     if (exec.status === "CLOSED") {
-      const tradeUsd = Number(exec.tradeUsd || exec.positionUsd || 0);
       const pnlPct = Number(exec.pnlPct || 0);
-      const pnlUsd = tradeUsd * (pnlPct / 100);
+      const pnlUsd = Number(
+        exec.pnlRealizedNet ??
+          exec.pnlUsd ??
+          exec.pnlRealizedGross ??
+          0
+      );
 
       bucket.pnlUsd += pnlUsd;
 
@@ -142,19 +188,61 @@ function buildExecutionBreakdown(executions) {
   return byMode;
 }
 
-function getUsdcSnapshot(exchange) {
-  const usdc =
-    (exchange?.balances || []).find((b) => b.asset === "USDC") || {
-      asset: "USDC",
+function isFuturesSnapshot(exchange) {
+  return (
+    exchange?.snapshotType === "futures" ||
+    Number.isFinite(Number(exchange?.totalWalletBalance)) ||
+    Number.isFinite(Number(exchange?.availableBalance)) ||
+    Array.isArray(exchange?.positions)
+  );
+}
+
+function getBalanceSnapshot(exchange) {
+  if (isFuturesSnapshot(exchange)) {
+    const availableBalance = Number(exchange?.availableBalance || 0);
+    const walletBalance = Number(exchange?.totalWalletBalance || 0);
+    const marginBalance = Number(
+      exchange?.totalMarginBalance || walletBalance || availableBalance || 0
+    );
+    const unrealizedPnl = Number(exchange?.totalUnrealizedProfit || 0);
+    const lockedBalance = Math.max(0, marginBalance - availableBalance);
+
+    return {
+      snapshotType: "futures",
+      asset: String(exchange?.quoteAsset || process.env.FUTURES_QUOTE_ASSET || "USDT"),
+      free: availableBalance,
+      locked: lockedBalance,
+      total: marginBalance,
+      availableBalance,
+      walletBalance,
+      marginBalance,
+      unrealizedPnl,
+      positions: Array.isArray(exchange?.positions) ? exchange.positions : [],
+      openOrders: Array.isArray(exchange?.openOrders) ? exchange.openOrders : [],
+    };
+  }
+
+  const quoteAsset = String(process.env.DASHBOARD_QUOTE_ASSET || "USDC");
+  const quote =
+    (exchange?.balances || []).find((b) => b.asset === quoteAsset) || {
+      asset: quoteAsset,
       free: 0,
       locked: 0,
       total: 0,
     };
 
   return {
-    free: Number(usdc.free || 0),
-    locked: Number(usdc.locked || 0),
-    total: Number(usdc.total || 0),
+    snapshotType: "spot",
+    asset: quoteAsset,
+    free: Number(quote.free || 0),
+    locked: Number(quote.locked || 0),
+    total: Number(quote.total || 0),
+    availableBalance: Number(quote.free || 0),
+    walletBalance: Number(quote.total || 0),
+    marginBalance: Number(quote.total || 0),
+    unrealizedPnl: 0,
+    positions: [],
+    openOrders: Array.isArray(exchange?.openOrders) ? exchange.openOrders : [],
   };
 }
 
@@ -183,20 +271,45 @@ function getClosedExecutionStats(state) {
 }
 
 function getOrCreatePerformanceBaseline(exchange) {
-  const usdc = getUsdcSnapshot(exchange);
+  const snap = getBalanceSnapshot(exchange);
   const fallbackStart = Number(process.env.ACCOUNT_SIZE || 1000);
-
   const current = readJsonSafe(PERFORMANCE_BASELINE_FILE, null);
+
+  const currentBalance =
+    snap.snapshotType === "futures"
+      ? Number(snap.marginBalance || snap.walletBalance || snap.total || 0)
+      : Number(snap.total || 0);
 
   if (
     current &&
     Number.isFinite(Number(current.startingBalance)) &&
     Number.isFinite(Number(current.peakBalance))
   ) {
+    if (current.snapshotType && current.snapshotType !== snap.snapshotType) {
+      const resetBaseline = {
+        createdAt: new Date().toISOString(),
+        snapshotType: snap.snapshotType,
+        asset: snap.asset,
+        startingBalance: currentBalance > 0 ? currentBalance : fallbackStart,
+        currentBalance: currentBalance > 0 ? currentBalance : fallbackStart,
+        peakBalance: currentBalance > 0 ? currentBalance : fallbackStart,
+        resetReason: `snapshot_type_changed:${current.snapshotType}->${snap.snapshotType}`,
+      };
+
+      writeJsonSafe(PERFORMANCE_BASELINE_FILE, resetBaseline);
+      return resetBaseline;
+    }
+
     let changed = false;
 
     if (!Number.isFinite(Number(current.currentBalance))) {
-      current.currentBalance = usdc.total;
+      current.currentBalance = currentBalance > 0 ? currentBalance : Number(current.startingBalance || fallbackStart);
+      changed = true;
+    }
+
+    if (!current.snapshotType || current.asset !== snap.asset) {
+      current.snapshotType = snap.snapshotType;
+      current.asset = snap.asset;
       changed = true;
     }
 
@@ -207,11 +320,15 @@ function getOrCreatePerformanceBaseline(exchange) {
     return current;
   }
 
+  const baselineValue = currentBalance > 0 ? currentBalance : fallbackStart;
+
   const baseline = {
     createdAt: new Date().toISOString(),
-    startingBalance: usdc.total > 0 ? usdc.total : fallbackStart,
-    currentBalance: usdc.total > 0 ? usdc.total : fallbackStart,
-    peakBalance: usdc.total > 0 ? usdc.total : fallbackStart,
+    snapshotType: snap.snapshotType,
+    asset: snap.asset,
+    startingBalance: baselineValue,
+    currentBalance: baselineValue,
+    peakBalance: baselineValue,
   };
 
   writeJsonSafe(PERFORMANCE_BASELINE_FILE, baseline);
@@ -219,14 +336,16 @@ function getOrCreatePerformanceBaseline(exchange) {
 }
 
 function buildPerformanceFromExchange(state, exchange) {
-  const usdc = getUsdcSnapshot(exchange);
+  const snap = getBalanceSnapshot(exchange);
   const baseline = getOrCreatePerformanceBaseline(exchange);
 
   const startingBalance = Number(baseline.startingBalance || 0);
   const previousPeak = Number(baseline.peakBalance || startingBalance);
 
   const effectiveCurrentBalance =
-    usdc.total > 0 ? usdc.total : Number(baseline.currentBalance || startingBalance);
+    snap.snapshotType === "futures"
+      ? Number(snap.marginBalance || snap.walletBalance || snap.total || 0)
+      : Number(snap.total || Number(baseline.currentBalance || startingBalance));
 
   const peakBalance = Math.max(previousPeak, effectiveCurrentBalance);
 
@@ -243,6 +362,8 @@ function buildPerformanceFromExchange(state, exchange) {
 
   const updatedBaseline = {
     ...baseline,
+    snapshotType: snap.snapshotType,
+    asset: snap.asset,
     currentBalance: effectiveCurrentBalance,
     peakBalance,
     updatedAt: new Date().toISOString(),
@@ -251,10 +372,19 @@ function buildPerformanceFromExchange(state, exchange) {
   writeJsonSafe(PERFORMANCE_BASELINE_FILE, updatedBaseline);
 
   return {
-    source: "binance_usdc_total",
-    usdcFree: Number(usdc.free.toFixed(6)),
-    usdcLocked: Number(usdc.locked.toFixed(6)),
-    usdcTotal: Number(usdc.total.toFixed(6)),
+    source:
+      snap.snapshotType === "futures"
+        ? "binance_futures_margin_balance"
+        : "binance_spot_quote_total",
+    snapshotType: snap.snapshotType,
+    asset: snap.asset,
+    availableBalance: Number(snap.availableBalance.toFixed(6)),
+    lockedBalance: Number(snap.locked.toFixed(6)),
+    totalBalance: Number(snap.total.toFixed(6)),
+    walletBalance: Number(Number(snap.walletBalance || 0).toFixed(6)),
+    marginBalance: Number(Number(snap.marginBalance || 0).toFixed(6)),
+    unrealizedPnl: Number(Number(snap.unrealizedPnl || 0).toFixed(6)),
+    positionsCount: Array.isArray(snap.positions) ? snap.positions.length : 0,
     startingBalance: Number(startingBalance.toFixed(2)),
     currentBalance: Number(effectiveCurrentBalance.toFixed(2)),
     peakBalance: Number(peakBalance.toFixed(2)),
@@ -268,8 +398,93 @@ function buildPerformanceFromExchange(state, exchange) {
   };
 }
 
+
+function getExecutionDirection(execution) {
+  return String(execution?.direction || execution?.side || "").toUpperCase();
+}
+
+function hasMatchingOpenPosition(exchange, execution) {
+  const positions = Array.isArray(exchange?.positions) ? exchange.positions : [];
+  const wantedSymbol = String(execution?.symbol || "").toUpperCase();
+  const wantedDirection = getExecutionDirection(execution);
+
+  return positions.some((p) => {
+    const symbolOk = String(p?.symbol || "").toUpperCase() === wantedSymbol;
+    const amt = Number(p?.positionAmt || 0);
+    if (!symbolOk || !Number.isFinite(amt) || Math.abs(amt) <= 1e-12) return false;
+
+    if (wantedDirection === "LONG" || wantedDirection === "BUY") return amt > 0;
+    if (wantedDirection === "SHORT" || wantedDirection === "SELL") return amt < 0;
+    return false;
+  });
+}
+
+function inferExchangeClose(execution) {
+  const outcomeInfo = resolveTradeOutcome(execution);
+  if (outcomeInfo.outcome === "TP") {
+    return { outcome: "TP", closeReason: execution.closeReason, exitPrice: Number(execution.tp) || null };
+  }
+  if (
+    outcomeInfo.outcome === "SL" ||
+    outcomeInfo.outcome === "BE" ||
+    outcomeInfo.outcome === "PROTECTED_SL"
+  ) {
+    return {
+      outcome: outcomeInfo.outcome,
+      closeReason: execution.closeReason,
+      exitPrice: Number(execution.sl) || null,
+    };
+  }
+
+  return {
+    outcome: execution?.outcome || "EXCHANGE",
+    closeReason: execution?.closeReason || "EXCHANGE_SYNC_CLOSE",
+    exitPrice: Number.isFinite(Number(execution?.exitPrice)) && Number(execution.exitPrice) > 0
+      ? Number(execution.exitPrice)
+      : null,
+  };
+}
+
+function reconcileExecutionsWithExchange(state, exchange) {
+  if (!state || !Array.isArray(state.executions) || !isFuturesSnapshot(exchange)) {
+    return { state, changed: false };
+  }
+
+  let changed = false;
+
+  for (const execution of state.executions) {
+    if (!execution || execution.status !== "OPEN" || execution.mode !== "binance_real") continue;
+
+    if (!Number.isFinite(Number(execution.openedTs)) || Number(execution.openedTs) <= 0) {
+      const fallbackOpenTs = Number(execution?.exchange?.openTransactTime) || Date.now();
+      execution.openedTs = fallbackOpenTs;
+      changed = true;
+    }
+
+    if (hasMatchingOpenPosition(exchange, execution)) continue;
+
+    execution.exchange = execution.exchange || {};
+    if (!execution.exchange.reconcileWarning) {
+      execution.exchange.reconcileWarning = "position_missing_pending_executor_reconcile";
+      changed = true;
+    }
+  }
+
+  return { state, changed };
+}
+
+function annotateTradeOutcome(record) {
+  const outcomeInfo = resolveTradeOutcome(record);
+  return {
+    ...record,
+    outcome: outcomeInfo.outcome,
+    outcomeTitle: outcomeInfo.title,
+    outcomeBucket: outcomeInfo.bucket,
+  };
+}
+
 function buildStats(state, mergedConfig, generatedConfig, metrics, exchange) {
-  const openSignals = Array.isArray(state.openSignals) ? state.openSignals : [];
+  const openSignalsRaw = Array.isArray(state.openSignals) ? state.openSignals : [];
   const closedSignals = Array.isArray(state.closedSignals) ? state.closedSignals : [];
   const signalLog = Array.isArray(state.signalLog) ? state.signalLog : [];
   const executions = Array.isArray(state.executions) ? state.executions : [];
@@ -277,6 +492,39 @@ function buildStats(state, mergedConfig, generatedConfig, metrics, exchange) {
   const executionStats = getClosedExecutionStats(state);
   const openExecutions = executions.filter((e) => e.status === "OPEN");
   const closedExecutions = executions.filter((e) => e.status === "CLOSED");
+
+  // If there is an OPEN execution for the same symbol+tf, prefer the *real* entry/sl/tp
+  // (Binance fill/position entry) over the signal's projected entry.
+  const openExecByKey = new Map();
+  for (const e of openExecutions) {
+    const key = `${e.symbol || ""}::${e.tf || ""}`;
+    if (!openExecByKey.has(key)) openExecByKey.set(key, e);
+  }
+
+  const openSignals = openSignalsRaw.map((s) => {
+    const key = `${s.symbol || ""}::${s.tf || ""}`;
+    const e = openExecByKey.get(key);
+    if (!e) return s;
+
+    return {
+      ...s,
+      // preserve projected values for debugging
+      projectedEntry: Number.isFinite(Number(s.entry)) ? Number(s.entry) : s.projectedEntry,
+      projectedSL: Number.isFinite(Number(s.sl)) ? Number(s.sl) : s.projectedSL,
+      projectedTP: Number.isFinite(Number(s.tp)) ? Number(s.tp) : s.projectedTP,
+
+      // overwrite with real execution values (what Binance shows)
+      entry: Number.isFinite(Number(e.entry)) ? Number(e.entry) : s.entry,
+      sl: Number.isFinite(Number(e.sl)) ? Number(e.sl) : s.sl,
+      tp: Number.isFinite(Number(e.tp)) ? Number(e.tp) : s.tp,
+
+      // extra clarity
+      entrySource: e.exchange?.entryPriceSource || "execution",
+      executionId: e.executionId || e.id || s.executionId,
+      mode: e.mode || s.mode,
+      status: "OPEN",
+    };
+  });
 
   let trendSignals = 0;
   let rangeSignals = 0;
@@ -305,8 +553,11 @@ function buildStats(state, mergedConfig, generatedConfig, metrics, exchange) {
     bySymbol[key].trades++;
     bySymbol[key].pnlSum += Number(t.pnlPct || 0);
 
-    if (t.outcome === "TP") bySymbol[key].tp++;
-    if (t.outcome === "SL") bySymbol[key].sl++;
+    const outcomeInfo = resolveTradeOutcome(t);
+    if (outcomeInfo.outcome === "TP" || outcomeInfo.outcome === "PROTECTED_SL") {
+      bySymbol[key].tp++;
+    }
+    if (outcomeInfo.outcome === "SL") bySymbol[key].sl++;
   }
 
   const byScoreBucket = {
@@ -333,9 +584,9 @@ function buildStats(state, mergedConfig, generatedConfig, metrics, exchange) {
     else byScoreBucket[bucket].ignore++;
   }
 
-  const recentClosed = [...closedSignals].slice(-100).reverse();
+  const recentClosed = [...closedSignals].slice(-100).reverse().map(annotateTradeOutcome);
   const recentSignals = [...signalLog].slice(-200).reverse();
-  const recentExecutions = [...executions].slice(-100).reverse();
+  const recentExecutions = [...executions].slice(-100).reverse().map(annotateTradeOutcome);
 
   const allSymbols = Array.from(
     new Set(
@@ -411,7 +662,199 @@ function getContentType(filePath) {
   return "text/plain; charset=utf-8";
 }
 
+function sendJson(res, statusCode, payload) {
+  res.writeHead(statusCode, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+  });
+  res.end(JSON.stringify(payload, null, 2));
+}
+
+function parseBotStatusOutput(stdout) {
+  const text = String(stdout || "").trim();
+
+  if (!text) {
+    return {
+      running: false,
+      processCount: 0,
+      runningCount: 0,
+      processes: [],
+      raw: text,
+    };
+  }
+
+  if (text.includes("Bot não está registado como ativo.")) {
+    return {
+      running: false,
+      processCount: 0,
+      runningCount: 0,
+      processes: [],
+      raw: text,
+    };
+  }
+
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const processes = lines
+    .map((line) => {
+      const m = line.match(/^- (.+?) \(pid (\d+)\): (RUNNING|STOPPED)$/);
+      if (!m) return null;
+
+      return {
+        name: m[1],
+        pid: Number(m[2]),
+        running: m[3] === "RUNNING",
+      };
+    })
+    .filter(Boolean);
+
+  return {
+    running: processes.some((p) => p.running),
+    processCount: processes.length,
+    runningCount: processes.filter((p) => p.running).length,
+    processes,
+    raw: text,
+  };
+}
+
+function runNodeScript(scriptName) {
+  return new Promise((resolve, reject) => {
+    execFile(
+      process.execPath,
+      [path.join(PROJECT_ROOT, scriptName)],
+      { cwd: PROJECT_ROOT },
+      (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error((stderr || stdout || error.message || "").trim()));
+          return;
+        }
+
+        resolve({
+          ok: true,
+          stdout: String(stdout || "").trim(),
+          stderr: String(stderr || "").trim(),
+        });
+      }
+    );
+  });
+}
+
+async function buildBotStatus() {
+  const result = await runNodeScript("botstatus.js");
+  return parseBotStatusOutput(result.stdout);
+}
+
+async function startBotProcesses() {
+  const result = await runNodeScript("botstart.js");
+  const status = await buildBotStatus();
+
+  return {
+    ok: true,
+    stdout: result.stdout,
+    ...status,
+  };
+}
+
+async function stopBotProcesses() {
+  const result = await runNodeScript("botstop.js");
+  const status = await buildBotStatus();
+
+  return {
+    ok: true,
+    stdout: result.stdout,
+    ...status,
+  };
+}
+
+async function resetHistoryFiles() {
+  const bot = await buildBotStatus();
+
+  if (bot.running) {
+    return {
+      ok: false,
+      error: "Stop the bot before resetting history.",
+      bot,
+    };
+  }
+
+  writeJsonSafe(STATE_FILE, {
+    lastSignal: {},
+    openSignals: [],
+    closedSignals: [],
+    executions: [],
+    signalLog: [],
+  });
+
+  writeJsonSafe(METRICS_FILE, []);
+  writeJsonSafe(ORDERS_LOG_FILE, []);
+  writeJsonSafe(ADAPTIVE_HISTORY_FILE, []);
+
+  deleteIfExists(PERFORMANCE_BASELINE_FILE);
+  deleteIfExists(RESEARCH_JSON_FILE);
+  deleteIfExists(RESEARCH_CSV_FILE);
+
+  return {
+    ok: true,
+    message: "History cleared successfully.",
+    cleared: [
+      path.basename(STATE_FILE),
+      path.basename(METRICS_FILE),
+      path.basename(ORDERS_LOG_FILE),
+      path.basename(ADAPTIVE_HISTORY_FILE),
+      path.basename(PERFORMANCE_BASELINE_FILE),
+      path.basename(RESEARCH_JSON_FILE),
+      path.basename(RESEARCH_CSV_FILE),
+    ],
+  };
+}
+
 const server = http.createServer(async (req, res) => {
+  if (req.method === "GET" && req.url === "/api/bot/status") {
+  try {
+    const status = await buildBotStatus();
+    sendJson(res, 200, status);
+  } catch (err) {
+    sendJson(res, 500, { ok: false, error: err.message || String(err) });
+  }
+  return;
+}
+
+  if (req.method === "POST" && req.url === "/api/bot/start") {
+  try {
+    const result = await startBotProcesses();
+    sendJson(res, 200, result);
+    return;
+  } catch (err) {
+    sendJson(res, 500, { ok: false, error: err.message || String(err) });
+    return;
+  }
+}
+
+  if (req.method === "POST" && req.url === "/api/bot/stop") {
+  try {
+    const result = await stopBotProcesses();
+    sendJson(res, 200, result);
+    return;
+  } catch (err) {
+    sendJson(res, 500, { ok: false, error: err.message || String(err) });
+    return;
+  }
+}
+
+  if (req.method === "POST" && req.url === "/api/history/reset") {
+    try {
+      const result = await resetHistoryFiles();
+      sendJson(res, result.ok ? 200 : 409, result);
+      return;
+    } catch (err) {
+      sendJson(res, 500, { ok: false, error: err.message || String(err) });
+      return;
+    }
+  }
+
   if (req.url === "/api/state") {
     try {
       const state = readJsonSafe(STATE_FILE, {
@@ -438,8 +881,13 @@ const server = http.createServer(async (req, res) => {
         };
       }
 
+      const reconciled = reconcileExecutionsWithExchange(state, exchange);
+      if (reconciled.changed) {
+        writeJsonSafe(STATE_FILE, reconciled.state);
+      }
+
       const payload = buildStats(
-        state,
+        reconciled.state,
         mergedConfig,
         generatedConfig,
         metrics,
@@ -448,33 +896,22 @@ const server = http.createServer(async (req, res) => {
 
       payload.executionMode = process.env.EXECUTION_MODE || "paper";
       payload.exchange = exchange;
-
-      res.writeHead(200, {
-        "Content-Type": "application/json; charset=utf-8",
-        "Cache-Control": "no-store",
-      });
-
-      res.end(JSON.stringify(payload, null, 2));
+      payload.botStatus = await buildBotStatus();
+      
+      sendJson(res, 200, payload);
       return;
     } catch (err) {
-      res.writeHead(500, {
-        "Content-Type": "application/json; charset=utf-8",
+      sendJson(res, 500, {
+        error: err.body || err.message || String(err),
       });
-
-      res.end(
-        JSON.stringify(
-          {
-            error: err.body || err.message || String(err),
-          },
-          null,
-          2
-        )
-      );
       return;
     }
   }
 
-  if (req.method === "POST" && req.url === "/api/market-sell") {
+  if (
+    req.method === "POST" &&
+    (req.url === "/api/market-close" || req.url === "/api/market-sell")
+  ) {
     try {
       let body = "";
 
@@ -488,10 +925,7 @@ const server = http.createServer(async (req, res) => {
           const executionId = parsed.executionId;
 
           if (!executionId) {
-            res.writeHead(400, {
-              "Content-Type": "application/json; charset=utf-8",
-            });
-            res.end(JSON.stringify({ ok: false, error: "executionId missing" }));
+            sendJson(res, 400, { ok: false, error: "executionId missing" });
             return;
           }
 
@@ -506,37 +940,21 @@ const server = http.createServer(async (req, res) => {
           const result = await forceCloseExecutionById(state, executionId);
           writeJsonSafe(STATE_FILE, state);
 
-          res.writeHead(200, {
-            "Content-Type": "application/json; charset=utf-8",
-            "Cache-Control": "no-store",
-          });
-          res.end(JSON.stringify(result, null, 2));
+          sendJson(res, result.ok ? 200 : 409, result);
         } catch (err) {
-          res.writeHead(500, {
-            "Content-Type": "application/json; charset=utf-8",
+          sendJson(res, 500, {
+            ok: false,
+            error: err.body || err.message || String(err),
           });
-          res.end(
-            JSON.stringify(
-              { ok: false, error: err.body || err.message || String(err) },
-              null,
-              2
-            )
-          );
         }
       });
 
       return;
     } catch (err) {
-      res.writeHead(500, {
-        "Content-Type": "application/json; charset=utf-8",
+      sendJson(res, 500, {
+        ok: false,
+        error: err.body || err.message || String(err),
       });
-      res.end(
-        JSON.stringify(
-          { ok: false, error: err.body || err.message || String(err) },
-          null,
-          2
-        )
-      );
       return;
     }
   }
@@ -565,6 +983,6 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Dashboard running at http://localhost:${PORT}`);
+server.listen(PORT, DASHBOARD_HOST, () => {
+  console.log(`Dashboard running at http://${DASHBOARD_HOST}:${PORT}`);
 });

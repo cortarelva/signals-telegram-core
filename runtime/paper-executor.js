@@ -5,9 +5,17 @@ const path = require("path");
 const https = require("https");
 const Binance = require("node-binance-api");
 const { canExecute } = require("./risk-manager");
+const {
+  appendJsonArray,
+  readJsonSafe,
+  writeJsonAtomic,
+} = require("./file-utils");
 
-const ORDERS_LOG_FILE = path.join(__dirname, "orders-log.json");
-const METRICS_FILE = path.join(__dirname, "execution-metrics.json");
+const ORDERS_LOG_FILE =
+  process.env.ORDERS_LOG_FILE_PATH || path.join(__dirname, "orders-log.json");
+const METRICS_FILE =
+  process.env.EXECUTION_METRICS_FILE_PATH ||
+  path.join(__dirname, "execution-metrics.json");
 const ADAPTIVE_CONFIG_FILE = path.join(__dirname, "runtime", "adaptive-config.json");
 
 const ACCOUNT_SIZE = Number(process.env.ACCOUNT_SIZE || 1000);
@@ -45,11 +53,7 @@ const filtersCache = new Map();
 /* -------------------- adaptive config -------------------- */
 
 function loadAdaptiveConfig() {
-  try {
-    return JSON.parse(fs.readFileSync(ADAPTIVE_CONFIG_FILE, "utf8"));
-  } catch {
-    return { symbols: {}, global: {} };
-  }
+  return readJsonSafe(ADAPTIVE_CONFIG_FILE, { symbols: {}, global: {} });
 }
 
 /* -------------------- retry -------------------- */
@@ -78,51 +82,35 @@ async function withRetry(fn, label, tries = 5) {
 /* -------------------- logs -------------------- */
 
 function loadOrdersLog() {
-  try {
-    return JSON.parse(fs.readFileSync(ORDERS_LOG_FILE, "utf8"));
-  } catch {
-    return [];
-  }
+  return readJsonSafe(ORDERS_LOG_FILE, []);
 }
 
 function saveOrdersLog(log) {
-  fs.writeFileSync(ORDERS_LOG_FILE, JSON.stringify(log, null, 2));
+  writeJsonAtomic(ORDERS_LOG_FILE, log);
 }
 
 function appendOrderLog(order) {
-  const log = loadOrdersLog();
-  log.push(order);
-
+  const log = appendJsonArray(ORDERS_LOG_FILE, order);
   if (log.length > 10000) {
-    log.shift();
+    saveOrdersLog(log.slice(-10000));
   }
-
-  saveOrdersLog(log);
 }
 
 /* -------------------- metrics -------------------- */
 
 function loadMetrics() {
-  try {
-    return JSON.parse(fs.readFileSync(METRICS_FILE, "utf8"));
-  } catch {
-    return [];
-  }
+  return readJsonSafe(METRICS_FILE, []);
 }
 
 function saveMetrics(metrics) {
-  fs.writeFileSync(METRICS_FILE, JSON.stringify(metrics, null, 2));
+  writeJsonAtomic(METRICS_FILE, metrics);
 }
 
 function recordExecutionMetric(metric) {
-  const metrics = loadMetrics();
-  metrics.push(metric);
-
+  const metrics = appendJsonArray(METRICS_FILE, metric);
   if (metrics.length > 5000) {
-    metrics.shift();
+    saveMetrics(metrics.slice(-5000));
   }
-
-  saveMetrics(metrics);
 }
 
 function computeAdaptiveSlippage(symbol = null) {
@@ -427,38 +415,39 @@ function buildExecution(signalObj, options = {}) {
   const effectiveSizing = sizing || fallbackSizing;
 
   return {
-    id: `${mode}_${Date.now()}_${signalObj.symbol}`,
-    ts: Date.now(),
-    signalTs: signalObj.ts,
-    mode,
-    status: "OPEN",
-    symbol: signalObj.symbol,
-    tf: signalObj.tf,
-    side: signalObj.side,
-    entry: signalObj.entry,
-    sl: signalObj.sl,
-    tp: signalObj.tp,
-    score: signalObj.score,
-    signalClass: signalObj.signalClass,
-    quantity: effectiveSizing.quantity,
-    riskAmount: effectiveSizing.riskAmount ?? null,
-    stopDistance: effectiveSizing.stopDistance ?? null,
-    positionUsd: effectiveSizing.positionUsd ?? 0,
-    tradeUsd: effectiveSizing.tradeUsd ?? effectiveSizing.positionUsd ?? 0,
-    freeQuote: effectiveSizing.freeQuote ?? null,
-    source: mode === "paper" ? "paper-executor" : "binance-spot",
-    isTrend: signalObj.isTrend ?? null,
-    isRange: signalObj.isRange ?? null,
-    adx: signalObj.adx ?? null,
-    atr: signalObj.atr ?? null,
-    rrPlanned: signalObj.rrPlanned ?? null,
-    closedTs: null,
-    closeReason: null,
-    exitPrice: null,
-    pnlPct: null,
-    commissionRate: COMMISSION_RATE,
-    outcome: null,
-    exchange: exchange || null,
+  id: `${mode}_${Date.now()}_${signalObj.symbol}`,
+  ts: Date.now(),
+  signalTs: signalObj.ts,
+  mode,
+  status: "OPEN",
+  symbol: signalObj.symbol,
+  tf: signalObj.tf,
+  strategy: signalObj.strategy || "unknown",
+  side: signalObj.side,
+  entry: signalObj.entry,
+  sl: signalObj.sl,
+  tp: signalObj.tp,
+  score: signalObj.score,
+  signalClass: signalObj.signalClass,
+  quantity: effectiveSizing.quantity,
+  riskAmount: effectiveSizing.riskAmount ?? null,
+  stopDistance: effectiveSizing.stopDistance ?? null,
+  positionUsd: effectiveSizing.positionUsd ?? 0,
+  tradeUsd: effectiveSizing.tradeUsd ?? effectiveSizing.positionUsd ?? 0,
+  freeQuote: effectiveSizing.freeQuote ?? null,
+  source: mode === "paper" ? "paper-executor" : "binance-spot",
+  isTrend: signalObj.isTrend ?? null,
+  isRange: signalObj.isRange ?? null,
+  adx: signalObj.adx ?? null,
+  atr: signalObj.atr ?? null,
+  rrPlanned: signalObj.rrPlanned ?? null,
+  closedTs: null,
+  closeReason: null,
+  exitPrice: null,
+  pnlPct: null,
+  commissionRate: COMMISSION_RATE,
+  outcome: null,
+  exchange: exchange || null,
   };
 }
 

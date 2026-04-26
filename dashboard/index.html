@@ -3,189 +3,327 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Signals Bot Dashboard</title>
+  <title>Signals Futures Dashboard</title>
+  <link
+    rel="icon"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop stop-color='%234fb6ff'/%3E%3Cstop offset='1' stop-color='%236ae2a1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='18' fill='%2308111b'/%3E%3Cpath d='M16 40l10-12 8 7 14-17' fill='none' stroke='url(%23g)' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='48' cy='18' r='5' fill='%23ffb86c'/%3E%3C/svg%3E"
+  />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
   <link rel="stylesheet" href="styles.css" />
-  <style>
-    .sell-btn {
-      background: #b91c1c;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      padding: 6px 10px;
-      font-weight: 600;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-
-    .sell-btn:hover {
-      background: #dc2626;
-    }
-  </style>
 </head>
 <body>
-  <div class="wrap">
-    <header class="topbar">
-      <div>
-        <h1>Signals Bot Dashboard</h1>
-        <div id="meta" class="muted">Loading...</div>
+  <div class="page-glow page-glow-a"></div>
+  <div class="page-glow page-glow-b"></div>
+
+  <div class="app-shell">
+    <header class="hero card">
+      <div class="hero-copy">
+        <div class="eyebrow">Live Operations Console</div>
+        <h1>Signals Futures Dashboard</h1>
+        <p class="hero-text">
+          Um cockpit mais limpo para acompanhar setup flow, execução, risco e realidade de exchange
+          sem andar a saltar entre secções.
+        </p>
+        <div id="meta" class="meta-strip">Loading...</div>
       </div>
-      <div class="topbar-actions">
-        <button id="refreshBtn" class="btn">Refresh</button>
+
+      <div class="hero-actions">
+        <div class="hero-status">
+          <span class="status-label">Estado do bot</span>
+          <div id="botStatusBadge" class="status-chip">BOT: ...</div>
+        </div>
+
+        <div class="button-cluster">
+          <button id="botStartBtn" class="btn btn-start">Start</button>
+          <button id="botStopBtn" class="btn btn-stop">Stop</button>
+          <button id="botResetBtn" class="btn btn-reset">Reset History</button>
+          <button id="refreshBtn" class="btn">Refresh</button>
+        </div>
       </div>
     </header>
 
-    <section class="card section">
-      <h2>Filtros</h2>
-      <div class="filters">
-        <div class="field">
-          <label for="symbolFilter">Símbolo</label>
-          <select id="symbolFilter"></select>
+    <section class="section history-section">
+      <div class="card section-card">
+        <div class="tabs-header">
+          <div>
+            <div class="eyebrow">Flow history</div>
+            <h2>Histórico</h2>
+          </div>
+          <div class="tabs-nav">
+            <button class="tab-btn active" data-tab="executionsTab">Últimas Executions</button>
+            <button class="tab-btn" data-tab="closedTab">Últimos Closed Signals</button>
+            <button class="tab-btn" data-tab="signalsTab">Últimos Sinais Avaliados</button>
+          </div>
         </div>
-        <div class="field">
-          <label for="tfFilter">Timeframe</label>
-          <select id="tfFilter"></select>
+
+        <div id="executionsTab" class="tab-panel active">
+          <div id="recentExecutions"></div>
         </div>
-        <div class="field">
-          <label for="classFilter">Classe</label>
-          <select id="classFilter">
-            <option value="ALL">Todas</option>
-            <option value="EXECUTABLE">EXECUTABLE</option>
-            <option value="WATCH">WATCH</option>
-            <option value="IGNORE">IGNORE</option>
-          </select>
+
+        <div id="closedTab" class="tab-panel">
+          <div id="recentClosed"></div>
         </div>
-        <div class="field">
-          <label for="regimeFilter">Regime</label>
-          <select id="regimeFilter">
-            <option value="ALL">Todos</option>
-            <option value="TREND">TREND</option>
-            <option value="RANGE">RANGE</option>
-            <option value="NEUTRAL">NEUTRAL</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="lookbackFilter">Lookback sinais</label>
-          <select id="lookbackFilter">
-            <option value="50">50</option>
-            <option value="100" selected>100</option>
-            <option value="200">200</option>
-            <option value="500">500</option>
-            <option value="999999">Todos</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="tvSymbol">TradingView symbol</label>
-          <select id="tvSymbol"></select>
+
+        <div id="signalsTab" class="tab-panel">
+          <div id="recentSignals"></div>
         </div>
       </div>
     </section>
 
-    <section class="grid cards section" id="cards"></section>
+    <section class="section command-grid">
+      <div class="card section-card">
+        <div class="section-header">
+          <div>
+            <div class="eyebrow">Controlos</div>
+            <h2>Filtros e mercado no ecrã</h2>
+            <p class="section-copy">
+              Isola o fluxo relevante por símbolo, regime e timeframe, e escolhe o mercado no
+              TradingView sem perder contexto.
+            </p>
+          </div>
+        </div>
 
-    <section class="card section">
-      <h2>Performance</h2>
-      <div id="performanceCards" class="grid cards"></div>
-    </section>
-
-    <section class="card section">
-      <h2>Exchange Reality</h2>
-      <div id="exchangeCards" class="grid cards"></div>
-    </section>
-
-    <section class="card section">
-      <h2>Execution Metrics</h2>
-      <div id="executionMetricsCards" class="grid cards"></div>
-    </section>
-
-    <section class="card section">
-      <h2>Execution Modes</h2>
-      <div id="executionModesCards" class="grid cards"></div>
-    </section>
-
-    <section class="two-col section">
-      <div class="card">
-        <h2>TradingView</h2>
-        <div id="tvChart" class="tv-chart"></div>
+        <div class="filters">
+          <div class="field">
+            <label for="symbolFilter">Símbolo</label>
+            <select id="symbolFilter"></select>
+          </div>
+          <div class="field">
+            <label for="tfFilter">Timeframe</label>
+            <select id="tfFilter"></select>
+          </div>
+          <div class="field">
+            <label for="classFilter">Classe</label>
+            <select id="classFilter">
+              <option value="ALL">Todas</option>
+              <option value="EXECUTABLE">EXECUTABLE</option>
+              <option value="WATCH">WATCH</option>
+              <option value="BLOCKED">BLOCKED</option>
+              <option value="IGNORE">IGNORE</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="regimeFilter">Regime</label>
+            <select id="regimeFilter">
+              <option value="ALL">Todos</option>
+              <option value="TREND">TREND</option>
+              <option value="RANGE">RANGE</option>
+              <option value="NEUTRAL">NEUTRAL</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="lookbackFilter">Lookback sinais</label>
+            <select id="lookbackFilter">
+              <option value="50">50</option>
+              <option value="100" selected>100</option>
+              <option value="200">200</option>
+              <option value="500">500</option>
+              <option value="999999">Todos</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="tvSymbol">TradingView symbol</label>
+            <select id="tvSymbol"></select>
+          </div>
+        </div>
       </div>
 
-      <div class="card">
-        <h2>Resumo do filtro atual</h2>
+      <div class="card section-card summary-card">
+        <div class="section-header">
+          <div>
+            <div class="eyebrow">Snapshot</div>
+            <h2>Resumo do filtro atual</h2>
+            <p class="section-copy">
+              Uma leitura rápida do que está a entrar no funil, quanto risco estás a aceitar e qual
+              a qualidade média do contexto visível.
+            </p>
+          </div>
+        </div>
         <div id="filterSummary"></div>
       </div>
     </section>
 
-    <section class="two-col section">
-      <div class="card">
-        <h2>Top Assets Reais</h2>
-        <div id="exchangeBalances"></div>
+    <section class="section">
+      <div class="section-header">
+        <div>
+          <div class="eyebrow">Mission Control</div>
+          <h2>Leitura rápida do bot</h2>
+        </div>
+      </div>
+      <div class="grid cards spotlight-grid" id="cards"></div>
+    </section>
+
+    <section class="section mission-grid">
+      <div class="card section-card">
+        <div class="section-header">
+          <div>
+            <div class="eyebrow">Decision Board</div>
+            <h2>Motor agora</h2>
+            <p class="section-copy">
+              O que o bot está a ver neste momento, o que ficou bloqueado e como a camada de ML
+              está a interferir nas decisões.
+            </p>
+          </div>
+        </div>
+        <div id="decisionBoard"></div>
       </div>
 
-      <div class="card">
-        <h2>Open Orders Reais</h2>
-        <div id="exchangeOpenOrders"></div>
+      <div class="card section-card">
+        <div class="section-header">
+          <div>
+            <div class="eyebrow">Live Focus</div>
+            <h2>Exposição ativa</h2>
+            <p class="section-copy">
+              Um painel compacto para a posição aberta, proteção e realidade de exchange sem ter de
+              abrir várias tabelas.
+            </p>
+          </div>
+        </div>
+        <div id="liveFocus"></div>
       </div>
     </section>
 
-    <section class="grid chart-grid section">
-      <div class="card">
-        <h2>Sinais por classe</h2>
-        <canvas id="classChart"></canvas>
+    <section class="section insight-grid">
+      <div class="card section-card">
+        <div class="section-header">
+          <div>
+            <div class="eyebrow">Account curve</div>
+            <h2>Performance</h2>
+          </div>
+        </div>
+        <div id="performanceCards" class="grid cards"></div>
       </div>
 
-      <div class="card">
-        <h2>Regime de mercado</h2>
-        <canvas id="regimeChart"></canvas>
+      <div class="card section-card">
+        <div class="section-header">
+          <div>
+            <div class="eyebrow">Reality check</div>
+            <h2>Exchange Reality</h2>
+          </div>
+        </div>
+        <div id="exchangeCards" class="grid cards"></div>
       </div>
 
-      <div class="card">
-        <h2>Distribuição por score</h2>
-        <canvas id="scoreChart"></canvas>
+      <div class="card section-card">
+        <div class="section-header">
+          <div>
+            <div class="eyebrow">Execution quality</div>
+            <h2>Execution Metrics</h2>
+          </div>
+        </div>
+        <div id="executionMetricsCards" class="grid cards"></div>
       </div>
 
-      <div class="card">
-        <h2>PnL médio por símbolo</h2>
-        <canvas id="symbolPnlChart"></canvas>
+      <div class="card section-card">
+        <div class="section-header">
+          <div>
+            <div class="eyebrow">Routing</div>
+            <h2>Execution Modes</h2>
+          </div>
+        </div>
+        <div id="executionModesCards" class="grid cards"></div>
       </div>
     </section>
 
-    <section class="two-col section">
-      <div class="card">
-        <h2>Performance por símbolo</h2>
-        <div id="bySymbol"></div>
-      </div>
+    <section class="section workspace-grid">
+      <div class="workspace-main">
+        <div class="card section-card">
+          <div class="section-header">
+            <div>
+              <div class="eyebrow">Market view</div>
+              <h2>TradingView</h2>
+            </div>
+          </div>
+          <div id="tvChart" class="tv-chart"></div>
+        </div>
 
-      <div class="card">
-        <h2>Distribuição por score</h2>
-        <div id="byScore"></div>
-      </div>
-    </section>
+        <div class="grid chart-grid">
+          <div class="card section-card">
+            <div class="section-header compact">
+              <h2>Sinais por classe</h2>
+            </div>
+            <canvas id="classChart"></canvas>
+          </div>
 
-    <section class="card section">
-      <h2>Open Signals</h2>
-      <div id="openSignals"></div>
-    </section>
+          <div class="card section-card">
+            <div class="section-header compact">
+              <h2>Regime de mercado</h2>
+            </div>
+            <canvas id="regimeChart"></canvas>
+          </div>
 
-    <section class="card section">
-      <div class="tabs-header">
-        <h2>Histórico</h2>
-        <div class="tabs-nav">
-          <button class="tab-btn active" data-tab="executionsTab">Últimas Executions</button>
-          <button class="tab-btn" data-tab="closedTab">Últimos Closed Signals</button>
-          <button class="tab-btn" data-tab="signalsTab">Últimos Sinais Avaliados</button>
+          <div class="card section-card">
+            <div class="section-header compact">
+              <h2>Distribuição por score</h2>
+            </div>
+            <canvas id="scoreChart"></canvas>
+          </div>
+
+          <div class="card section-card">
+            <div class="section-header compact">
+              <h2>PnL médio por símbolo</h2>
+            </div>
+            <canvas id="symbolPnlChart"></canvas>
+          </div>
         </div>
       </div>
 
-      <div id="executionsTab" class="tab-panel active">
-        <div id="recentExecutions"></div>
-      </div>
+      <aside class="workspace-side">
+        <div class="card section-card">
+          <div class="section-header compact">
+            <div>
+              <div class="eyebrow">Live inventory</div>
+              <h2>Open Signals</h2>
+            </div>
+          </div>
+          <div id="openSignals"></div>
+        </div>
 
-      <div id="closedTab" class="tab-panel">
-        <div id="recentClosed"></div>
-      </div>
+        <div class="card section-card">
+          <div class="section-header compact">
+            <div>
+              <div class="eyebrow">Portfolio</div>
+              <h2>Balanços / Posições Reais</h2>
+            </div>
+          </div>
+          <div id="exchangeBalances"></div>
+        </div>
 
-      <div id="signalsTab" class="tab-panel">
-        <div id="recentSignals"></div>
-      </div>
+        <div class="card section-card">
+          <div class="section-header compact">
+            <div>
+              <div class="eyebrow">Market exposure</div>
+              <h2>Ordens Abertas Reais</h2>
+            </div>
+          </div>
+          <div id="exchangeOpenOrders"></div>
+        </div>
+
+        <div class="card section-card">
+          <div class="section-header compact">
+            <div>
+              <div class="eyebrow">Breakdown</div>
+              <h2>Performance por símbolo</h2>
+            </div>
+          </div>
+          <div id="bySymbol"></div>
+        </div>
+
+        <div class="card section-card">
+          <div class="section-header compact">
+            <div>
+              <div class="eyebrow">Decision patterns</div>
+              <h2>Razões dominantes</h2>
+            </div>
+          </div>
+          <div id="byScore"></div>
+        </div>
+      </aside>
     </section>
   </div>
 

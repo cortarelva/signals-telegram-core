@@ -1,109 +1,94 @@
 const fs = require("fs");
 const path = require("path");
+const {
+  readJsonSafe: readRuntimeJsonSafe,
+  writeJsonAtomic,
+} = require("../runtime/file-utils");
 
-const STATE_FILE = path.join(__dirname, "..", "runtime", "state.json");
-const EXEC_METRICS_FILE = path.join(__dirname, "..", "runtime", "execution-metrics.json");
-const ORDERS_LOG_FILE = path.join(__dirname, "..", "runtime", "orders-log.json");
+const PROJECT_ROOT = path.join(__dirname, "..");
+const RUNTIME_DIR = path.join(PROJECT_ROOT, "runtime");
 
-const OUT_JSON = path.join(__dirname, "consolidated-trades.json");
-const OUT_CSV = path.join(__dirname, "consolidated-trades.csv");
+const STATE_FILE =
+  process.env.STATE_FILE_PATH || path.join(RUNTIME_DIR, "state.json");
+const METRICS_FILE =
+  process.env.EXECUTION_METRICS_FILE_PATH ||
+  path.join(RUNTIME_DIR, "execution-metrics.json");
+const ORDERS_LOG_FILE =
+  process.env.ORDERS_LOG_FILE_PATH || path.join(RUNTIME_DIR, "orders-log.json");
 
-const MAX_EXEC_MATCH_DIFF_MS = 10 * 1000; // 10s
+const OUTPUT_JSON = path.join(__dirname, "consolidated-trades.json");
+const OUTPUT_CSV = path.join(__dirname, "consolidated-trades.csv");
 
-function loadJson(filePath) {
-  if (!fs.existsSync(filePath)) {
-    throw new Error(`Ficheiro não encontrado: ${filePath}`);
+
+const IGNORE_EXECUTION_IDS = new Set([
+  "futures_real_1775640186301_XRPUSDC_LONG",
+]);
+
+function shouldIgnoreExecution(exec) {
+  if (!exec || !exec.id) return false;
+  return IGNORE_EXECUTION_IDS.has(exec.id);
+}
+
+function readJsonSafe(filePath, fallback) {
+  return readRuntimeJsonSafe(filePath, fallback);
+}
+
+function writeJsonSafe(filePath, value) {
+  writeJsonAtomic(filePath, value);
+}
+
+function safeNum(v, fallback = null) {
+  if (v === null || v === undefined || v === "") return fallback;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function hasValue(v) {
+  return v !== null && v !== undefined && !(typeof v === "number" && !Number.isFinite(v));
+}
+
+function avg(arr) {
+  const nums = (Array.isArray(arr) ? arr : [])
+    .filter((n) => Number.isFinite(Number(n)))
+    .map(Number);
+  if (!nums.length) return 0;
+  return nums.reduce((a, b) => a + b, 0) / nums.length;
+}
+
+function highest(arr) {
+  const nums = (Array.isArray(arr) ? arr : [])
+    .filter((n) => Number.isFinite(Number(n)))
+    .map(Number);
+  if (!nums.length) return null;
+  return Math.max(...nums);
+}
+
+function lowest(arr) {
+  const nums = (Array.isArray(arr) ? arr : [])
+    .filter((n) => Number.isFinite(Number(n)))
+    .map(Number);
+  if (!nums.length) return null;
+  return Math.min(...nums);
+}
+
+function round(v, digits = 8) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  return Number(n.toFixed(digits));
+}
+
+function toIso(ts) {
+  const n = Number(ts);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  try {
+    return new Date(n).toISOString();
+  } catch {
+    return null;
   }
-  return JSON.parse(fs.readFileSync(filePath, "utf8"));
-}
-
-function safeNum(v) {
-  return typeof v === "number" && Number.isFinite(v) ? v : null;
-}
-
-function absDiff(a, b) {
-  return Math.abs((a || 0) - (b || 0));
-}
-
-function normalizeOutcome(v) {
-  if (!v || typeof v !== "string") return null;
-  const x = v.toUpperCase();
-
-  if (x.includes("TP")) return "TP";
-  if (x.includes("SL")) return "SL";
-  if (x.includes("STOP")) return "SL";
-  return x;
-}
-
-function getExecutionRows(ordersLog) {
-  return ordersLog.filter(
-    (row) =>
-      row &&
-      typeof row === "object" &&
-      row.id &&
-      row.side === "BUY" &&
-      row.entry != null
-  );
-}
-
-function getCloseRows(ordersLog) {
-  return ordersLog.filter(
-    (row) =>
-      row &&
-      typeof row === "object" &&
-      (
-        row.type === "real_sell_close" ||
-        row.linkedExecutionId ||
-        row.closeReason ||
-        row.exitPrice != null
-      )
-  );
-}
-
-function indexBy(arr, keyFn) {
-  const map = new Map();
-  for (const item of arr) {
-    const key = keyFn(item);
-    if (key != null) map.set(key, item);
-  }
-  return map;
-}
-
-function findNearestExecMetric(metrics, symbol, ts) {
-  let best = null;
-  let bestDiff = Infinity;
-
-  for (const m of metrics) {
-    if (m.symbol !== symbol) continue;
-    const diff = absDiff(m.ts, ts);
-    if (diff <= MAX_EXEC_MATCH_DIFF_MS && diff < bestDiff) {
-      best = m;
-      bestDiff = diff;
-    }
-  }
-
-  return { metric: best, diffMs: best ? bestDiff : null };
-}
-
-function calcRealizedR(trade) {
-  const entry = safeNum(trade.entryFill ?? trade.entry);
-  const sl = safeNum(trade.sl);
-  const exit = safeNum(trade.exitPrice);
-
-  if (entry == null || sl == null || exit == null) return null;
-
-  const risk = Math.abs(entry - sl);
-  if (risk === 0) return null;
-
-  if ((trade.side || "BUY") === "BUY") {
-    return (exit - entry) / risk;
-  }
-
-  return (entry - exit) / risk;
 }
 
 function csvEscape(value) {
-  if (value == null) return "";
+  if (value === null || value === undefined) return "";
   const s = String(value);
   if (s.includes('"') || s.includes(",") || s.includes("\n")) {
     return `"${s.replace(/"/g, '""')}"`;
@@ -113,7 +98,6 @@ function csvEscape(value) {
 
 function toCsv(rows) {
   if (!rows.length) return "";
-
   const headers = Array.from(
     rows.reduce((set, row) => {
       Object.keys(row).forEach((k) => set.add(k));
@@ -121,238 +105,581 @@ function toCsv(rows) {
     }, new Set())
   );
 
-  const lines = [headers.join(",")];
-
-  for (const row of rows) {
-    lines.push(headers.map((h) => csvEscape(row[h])).join(","));
-  }
+  const lines = [
+    headers.join(","),
+    ...rows.map((row) => headers.map((h) => csvEscape(row[h])).join(",")),
+  ];
 
   return lines.join("\n");
 }
 
-function main() {
-  const state = loadJson(STATE_FILE);
-  const executionMetrics = loadJson(EXEC_METRICS_FILE);
-  const ordersLog = loadJson(ORDERS_LOG_FILE);
-
-  if (!Array.isArray(state.closedSignals)) {
-    throw new Error("state.json não tem state.closedSignals");
+function latestBy(arr, keyGetter) {
+  const map = new Map();
+  for (const item of arr || []) {
+    const key = keyGetter(item);
+    if (!key) continue;
+    map.set(key, item);
   }
-  if (!Array.isArray(executionMetrics)) {
-    throw new Error("execution-metrics.json deve ser array");
+  return map;
+}
+
+function groupBy(arr, keyGetter) {
+  const map = new Map();
+  for (const item of arr || []) {
+    const key = keyGetter(item);
+    if (!key) continue;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(item);
   }
-  if (!Array.isArray(ordersLog)) {
-    throw new Error("orders-log.json deve ser array");
+  return map;
+}
+
+function calcTpDistancePct(entry, tp) {
+  const e = safeNum(entry);
+  const t = safeNum(tp);
+  if (!Number.isFinite(e) || !Number.isFinite(t) || e <= 0) return null;
+  return round(Math.abs(t - e) / e, 8);
+}
+
+function calcTpDistanceAtr(entry, tp, atr) {
+  const e = safeNum(entry);
+  const t = safeNum(tp);
+  const a = safeNum(atr);
+  if (!Number.isFinite(e) || !Number.isFinite(t) || !Number.isFinite(a) || a <= 0) return null;
+  return round(Math.abs(t - e) / a, 8);
+}
+
+function calcRrPlanned(entry, sl, tp) {
+  const e = safeNum(entry);
+  const s = safeNum(sl);
+  const t = safeNum(tp);
+  if (!Number.isFinite(e) || !Number.isFinite(s) || !Number.isFinite(t)) return null;
+  const risk = Math.abs(e - s);
+  if (!(risk > 0)) return null;
+  return round(Math.abs(t - e) / risk, 8);
+}
+
+function calcRrRealized(direction, entry, sl, exitPrice) {
+  const e = safeNum(entry);
+  const s = safeNum(sl);
+  const x = safeNum(exitPrice);
+  if (!Number.isFinite(e) || !Number.isFinite(s) || !Number.isFinite(x)) return null;
+
+  const risk = Math.abs(e - s);
+  if (!(risk > 0)) return null;
+
+  let reward = null;
+  if (direction === "SHORT") reward = e - x;
+  else if (direction === "LONG") reward = x - e;
+
+  if (!Number.isFinite(reward)) return null;
+  return round(reward / risk, 8);
+}
+
+function calcPnlPct(direction, entry, exitPrice) {
+  const e = safeNum(entry);
+  const x = safeNum(exitPrice);
+  if (!Number.isFinite(e) || !Number.isFinite(x) || e <= 0) return null;
+  if (direction === "LONG") return round(((x - e) / e) * 100, 8);
+  if (direction === "SHORT") return round(((e - x) / e) * 100, 8);
+  return null;
+}
+
+function quoteAssetFromSymbol(symbol) {
+  if (String(symbol || "").toUpperCase().endsWith("USDC")) return "USDC";
+  if (String(symbol || "").toUpperCase().endsWith("USDT")) return "USDT";
+  return "USDT";
+}
+
+function baseAssetFromSymbol(symbol) {
+  const value = String(symbol || "").toUpperCase();
+  if (value.endsWith("USDC") || value.endsWith("USDT")) return value.slice(0, -4);
+  return value;
+}
+
+function estimateFeeQuoteEquivalent(symbol, fill = {}) {
+  const commission = safeNum(fill?.commission, null);
+  if (!Number.isFinite(commission) || commission <= 0) return null;
+
+  const quoteAsset = quoteAssetFromSymbol(symbol);
+  const baseAsset = baseAssetFromSymbol(symbol);
+  const asset = String(fill?.commissionAsset || quoteAsset).toUpperCase();
+  const price = safeNum(fill?.price, null);
+
+  if (asset === quoteAsset) return commission;
+  if (
+    (asset === "USDT" && quoteAsset === "USDC") ||
+    (asset === "USDC" && quoteAsset === "USDT") ||
+    asset === "BNFCR"
+  ) {
+    return commission;
   }
 
-  const closedSignals = state.closedSignals;
-  const openExecutionRows = getExecutionRows(ordersLog);
-  const closeRows = getCloseRows(ordersLog);
+  if (asset === baseAsset && Number.isFinite(price) && price > 0) {
+    return commission * price;
+  }
 
-  const openByExecutionId = indexBy(openExecutionRows, (r) => r.id);
-  const closeByExecutionId = indexBy(closeRows, (r) => r.linkedExecutionId);
+  return null;
+}
 
-  const consolidated = closedSignals.map((signal) => {
-    const executionId = signal.executionOrderId || null;
+function sumRealizedPnlFromFills(fills = []) {
+  const rows = Array.isArray(fills) ? fills : [];
+  const values = rows
+    .map((fill) => safeNum(fill?.realizedPnl, null))
+    .filter((value) => Number.isFinite(value));
+  if (!values.length) return null;
+  return round(values.reduce((sum, value) => sum + value, 0), 12);
+}
 
-    const openOrder = executionId ? openByExecutionId.get(executionId) || null : null;
-    const closeEvent = executionId ? closeByExecutionId.get(executionId) || null : null;
+function sumFeesFromFills(symbol, fills = []) {
+  const rows = Array.isArray(fills) ? fills : [];
+  if (!rows.length) return null;
 
-    const execMetricMatch = findNearestExecMetric(
-      executionMetrics,
-      signal.symbol,
-      openOrder?.ts || signal.closedTs || signal.ts
-    );
+  let total = 0;
+  let found = false;
 
-    const entrySignal = safeNum(execMetricMatch.metric?.entrySignal ?? signal.entry);
-    const entryFill = safeNum(execMetricMatch.metric?.entryFill ?? openOrder?.entry ?? signal.entry);
-    const exitPrice = safeNum(
-      closeEvent?.exitPrice ??
-      signal.exitRef ??
-      openOrder?.exitPrice ??
-      null
-    );
+  for (const fill of rows) {
+    const fee = estimateFeeQuoteEquivalent(symbol, fill);
+    if (!Number.isFinite(fee)) continue;
+    total += fee;
+    found = true;
+  }
 
-    const outcome = normalizeOutcome(
-      closeEvent?.closeReason ??
-      signal.outcome ??
-      openOrder?.outcome ??
-      openOrder?.closeReason
-    );
+  return found ? round(total, 12) : null;
+}
 
-    const closedTs =
-      closeEvent?.ts ??
-      closeEvent?.closedTs ??
-      signal.closedTs ??
-      openOrder?.closedTs ??
-      null;
+function inferOutcome(exec, signal) {
+  const explicit =
+    signal?.outcome ||
+    exec?.closeReasonInternal ||
+    exec?.closeReasonExchange ||
+    exec?.closeReason ||
+    null;
 
-    const row = {
-      executionId,
-      symbol: signal.symbol || openOrder?.symbol || null,
-      tf: signal.tf || openOrder?.tf || null,
-      side: signal.side || openOrder?.side || "BUY",
+  if (
+    explicit === "TP" ||
+    explicit === "SL" ||
+    explicit === "MANUAL_MARKET_CLOSE" ||
+    explicit === "MANUAL_CLOSE"
+  ) {
+    return explicit;
+  }
 
-      signalTs: signal.signalTs ?? signal.ts ?? openOrder?.signalTs ?? null,
-      openTs: openOrder?.ts ?? null,
-      closedTs,
+  const exitPrice = safeNum(exec?.exitPrice);
+  const tp = safeNum(exec?.tp);
+  const sl = safeNum(exec?.sl);
 
-      statusAtOpen: openOrder?.status ?? null,
-      mode: openOrder?.mode ?? null,
-      source: openOrder?.source ?? null,
+  if (
+    Number.isFinite(exitPrice) &&
+    Number.isFinite(tp) &&
+    Math.abs(exitPrice - tp) / Math.max(tp, 1e-9) < 0.0005
+  ) {
+    return "TP";
+  }
 
-      entrySignal,
-      entryFill,
-      entry: safeNum(openOrder?.entry ?? signal.entry),
-      rawEntry: safeNum(signal.rawEntry ?? openOrder?.rawEntry),
-      projectedEntry: safeNum(signal.projectedEntry ?? openOrder?.projectedEntry),
-      entryProjectionAtrMult: safeNum(
-        signal.entryProjectionAtrMult ?? openOrder?.entryProjectionAtrMult
-      ),
+  if (
+    Number.isFinite(exitPrice) &&
+    Number.isFinite(sl) &&
+    Math.abs(exitPrice - sl) / Math.max(sl, 1e-9) < 0.0005
+  ) {
+    return "SL";
+  }
 
-      sl: safeNum(signal.sl ?? openOrder?.sl),
-      tp: safeNum(signal.tp ?? openOrder?.tp),
-      tpRawAtr: safeNum(signal.tpRawAtr ?? openOrder?.tpRawAtr),
-      tpCappedByResistance:
-        signal.tpCappedByResistance ??
-        openOrder?.tpCappedByResistance ??
-        null,
-      tpDistancePct: safeNum(signal.tpDistancePct ?? openOrder?.tpDistancePct),
-      tpDistanceAtr: safeNum(signal.tpDistanceAtr ?? openOrder?.tpDistanceAtr),
+  const pnlPct = safeNum(exec?.pnlPct);
+  if (Number.isFinite(pnlPct)) {
+    if (pnlPct > 0) return "WIN";
+    if (pnlPct < 0) return "LOSS";
+    return "BE";
+  }
 
-      exitPrice,
+  return null;
+}
 
-      quantity: safeNum(openOrder?.quantity),
-      grossQuantity: safeNum(openOrder?.grossQuantity),
-      positionUsd: safeNum(openOrder?.positionUsd),
-      tradeUsd: safeNum(openOrder?.tradeUsd),
-      freeQuote: safeNum(openOrder?.freeQuote),
+function buildOrderLogIndex(orderRows) {
+  const rows = Array.isArray(orderRows) ? orderRows : [];
+  const byExecutionId = groupBy(rows, (r) => r?.linkedExecutionId || null);
+  const latestByExecutionId = new Map();
 
-      score: safeNum(signal.score ?? openOrder?.score),
-      signalClass: signal.signalClass ?? openOrder?.signalClass ?? null,
+  for (const [execId, arr] of byExecutionId.entries()) {
+    const sorted = [...arr].sort((a, b) => Number(a?.ts || 0) - Number(b?.ts || 0));
+    latestByExecutionId.set(execId, sorted[sorted.length - 1]);
+  }
 
-      rsi: safeNum(signal.rsi),
-      prevRsi: safeNum(signal.prevRsi),
-      atr: safeNum(signal.atr ?? openOrder?.atr),
-      atrPct: safeNum(signal.atrPct),
-      adx: safeNum(signal.adx ?? openOrder?.adx),
+  return { byExecutionId, latestByExecutionId };
+}
 
-      ema20: safeNum(signal.ema20),
-      ema50: safeNum(signal.ema50),
-      ema200: safeNum(signal.ema200),
+function makeSignalIndexes(state) {
+  const closedSignals = Array.isArray(state.closedSignals) ? state.closedSignals : [];
+  const signalLog = Array.isArray(state.signalLog) ? state.signalLog : [];
 
-      bullish: signal.bullish ?? null,
-      bullishFast: signal.bullishFast ?? null,
-      nearEma20: signal.nearEma20 ?? null,
-      nearEma50: signal.nearEma50 ?? null,
-      nearPullback: signal.nearPullback ?? null,
-      stackedEma: signal.stackedEma ?? null,
-      rsiInBand: signal.rsiInBand ?? null,
-      rsiRising: signal.rsiRising ?? null,
-      isTrend: signal.isTrend ?? openOrder?.isTrend ?? null,
-      isRange: signal.isRange ?? openOrder?.isRange ?? null,
-      cooldownPassed: signal.cooldownPassed ?? null,
+  const allSignalRows = [...closedSignals, ...signalLog].filter(Boolean);
 
-      emaSeparationPct: safeNum(signal.emaSeparationPct),
-      emaSlopePct: safeNum(signal.emaSlopePct),
-      distToEma20: safeNum(signal.distToEma20),
-      distToEma50: safeNum(signal.distToEma50),
-      entryDiffPctFromLast: safeNum(signal.entryDiffPctFromLast),
+  const byExecutionId = latestBy(
+    allSignalRows,
+    (s) => s.executionOrderId || s.executionId || null
+  );
 
-      nearestSupport: safeNum(signal.nearestSupport),
-      nearestSupportStrength: signal.nearestSupportStrength ?? null,
-      nearestSupportTouches: safeNum(signal.nearestSupportTouches),
-      nearestResistance: safeNum(signal.nearestResistance),
-      nearestResistanceStrength: signal.nearestResistanceStrength ?? null,
-      nearestResistanceTouches: safeNum(signal.nearestResistanceTouches),
-      srPassed: signal.srPassed ?? null,
-      srReason: signal.srReason ?? null,
-      distanceToSupportAtr: safeNum(signal.distanceToSupportAtr),
-      distanceToResistanceAtr: safeNum(signal.distanceToResistanceAtr),
-
-      maxHighDuringTrade: safeNum(signal.maxHighDuringTrade),
-      minLowDuringTrade: safeNum(signal.minLowDuringTrade),
-      barsOpen: safeNum(signal.barsOpen),
-
-      executionAttempted: signal.executionAttempted ?? null,
-      executionApproved: signal.executionApproved ?? null,
-      executionReason: signal.executionReason ?? null,
-
-      rrPlanned: safeNum(signal.rrPlanned ?? openOrder?.rrPlanned),
-      rrRealizedLogged: safeNum(signal.rrRealized),
-      outcome,
-      closeReason: closeEvent?.closeReason ?? openOrder?.closeReason ?? signal.outcome ?? null,
-      pnlPct: safeNum(closeEvent?.pnlPct ?? signal.pnlPct ?? openOrder?.pnlPct),
-
-      commissionRate: safeNum(openOrder?.commissionRate),
-      entryOrderId: openOrder?.exchange?.entryOrderId ?? null,
-      entryClientOrderId: openOrder?.exchange?.entryClientOrderId ?? null,
-      entryTransactTime: openOrder?.exchange?.entryTransactTime ?? null,
-      entryStatus: openOrder?.exchange?.entryStatus ?? null,
-      entryExecutedQty: openOrder?.exchange?.entryExecutedQty ?? null,
-      entryQuoteQty: openOrder?.exchange?.entryQuoteQty ?? null,
-
-      exitOrderId: closeEvent?.exchange?.exitOrderId ?? null,
-      exitClientOrderId: closeEvent?.exchange?.exitClientOrderId ?? null,
-      exitTransactTime: closeEvent?.exchange?.exitTransactTime ?? null,
-      exitStatus: closeEvent?.exchange?.exitStatus ?? null,
-      exitExecutedQty: closeEvent?.exchange?.exitExecutedQty ?? null,
-      exitQuoteQty: closeEvent?.exchange?.exitQuoteQty ?? null,
-
-      slippagePct: safeNum(execMetricMatch.metric?.slippagePct),
-      latencyInternal: safeNum(execMetricMatch.metric?.latencyInternal),
-      latencyExchange: safeNum(execMetricMatch.metric?.latencyExchange),
-      latencyTotal: safeNum(execMetricMatch.metric?.latencyTotal),
-      execMetricTs: execMetricMatch.metric?.ts ?? null,
-      execMetricMatchDiffMs: execMetricMatch.diffMs,
-    };
-
-    row.rrRealized = calcRealizedR(row);
-
-    return row;
+  const bySymbolTf = groupBy(allSignalRows, (s) => {
+    if (!s?.symbol || !s?.tf) return null;
+    return `${s.symbol}__${s.tf}`;
   });
 
-  const csv = toCsv(consolidated);
+  return { closedSignals, signalLog, byExecutionId, bySymbolTf };
+}
 
-  fs.writeFileSync(OUT_JSON, JSON.stringify(consolidated, null, 2), "utf8");
-  fs.writeFileSync(OUT_CSV, csv, "utf8");
+function pickBestSignalForExecution(exec, signalIndexes) {
+  if (!exec) return null;
 
-  console.log("Closed signals:", closedSignals.length);
-  console.log("Open execution rows:", openExecutionRows.length);
-  console.log("Close rows:", closeRows.length);
-  console.log("Consolidated trades:", consolidated.length);
-  console.log("Saved JSON:", OUT_JSON);
-  console.log("Saved CSV:", OUT_CSV);
+  const direct = signalIndexes.byExecutionId.get(exec.id) || null;
+  if (direct) return direct;
 
-  const withR = consolidated.filter((r) => typeof r.rrRealized === "number");
-  const withSlippage = consolidated.filter((r) => typeof r.slippagePct === "number");
-  const withSr = consolidated.filter(
-    (r) =>
-      typeof r.distanceToSupportAtr === "number" ||
-      typeof r.distanceToResistanceAtr === "number"
-  );
-  const withTpCap = consolidated.filter((r) => r.tpCappedByResistance === true);
-  const withProjectedEntry = consolidated.filter(
-    (r) => typeof r.projectedEntry === "number"
-  );
-  const withTpDistance = consolidated.filter(
-    (r) =>
-      typeof r.tpDistancePct === "number" ||
-      typeof r.tpDistanceAtr === "number"
-  );
+  const key = exec.symbol && exec.tf ? `${exec.symbol}__${exec.tf}` : null;
+  if (!key) return null;
 
-  console.log("With rrRealized:", withR.length);
-  console.log("With slippage:", withSlippage.length);
-  console.log("With SR fields:", withSr.length);
-  console.log("With tpCappedByResistance:", withTpCap.length);
-  console.log("With projectedEntry:", withProjectedEntry.length);
-  console.log("With TP distance fields:", withTpDistance.length);
+  const candidates = signalIndexes.bySymbolTf.get(key) || [];
+  if (!candidates.length) return null;
 
-  if (withR.length) {
-    const avgR =
-      withR.reduce((sum, r) => sum + r.rrRealized, 0) / withR.length;
-    console.log("Avg rrRealized:", avgR.toFixed(4));
+  const openTs = Number(exec.openedTs || 0);
+  const closeTs = Number(exec.closedTs || 0);
+
+  let best = null;
+  let bestScore = Infinity;
+
+  for (const s of candidates) {
+    const sTs = Number(s.ts || s.signalTs || 0);
+    if (!Number.isFinite(sTs) || sTs <= 0) continue;
+
+    let score = Infinity;
+
+    if (openTs > 0) {
+      score = Math.abs(sTs - openTs);
+      if (sTs > openTs + 10 * 60 * 1000) score += 1e9;
+    } else if (closeTs > 0) {
+      score = Math.abs(sTs - closeTs);
+    }
+
+    if (score < bestScore) {
+      bestScore = score;
+      best = s;
+    }
   }
+
+  return best;
+}
+
+function buildMetricsIndex(metricsRows) {
+  const rows = Array.isArray(metricsRows) ? metricsRows : [];
+  return latestBy(rows, (m) => m.executionId || m.linkedExecutionId || null);
+}
+
+function buildRow(exec, signal, metric, orderRowsForExec) {
+  const direction = exec.direction || signal?.direction || null;
+  const openFills = Array.isArray(exec.exchange?.openFills) ? exec.exchange.openFills : [];
+  const closeFills = Array.isArray(exec.exchange?.closeFills) ? exec.exchange.closeFills : [];
+
+  const entryPlanned = safeNum(exec.entryPlanned ?? signal?.entry ?? signal?.entrySignal ?? exec.entry);
+  const entryFill = safeNum(exec.entryFill ?? exec.entryPrice ?? exec.entry);
+  const entrySignal = safeNum(signal?.entry ?? signal?.entrySignal ?? exec.entryPlanned ?? exec.entry);
+  const rawEntry = safeNum(signal?.rawEntry ?? signal?.entry);
+  const projectedEntry = safeNum(signal?.projectedEntry);
+  const entryProjectionAtrMult = safeNum(signal?.entryProjectionAtrMult);
+
+  const sl = safeNum(exec.sl ?? signal?.sl);
+  const tp = safeNum(exec.tp ?? signal?.tp);
+  const atr = safeNum(signal?.atr);
+  const exitPlanned = safeNum(exec.exitPlanned ?? signal?.exitPlanned ?? signal?.exitRef);
+  const exitFill = safeNum(exec.exitFill ?? exec.exitPrice);
+  const exitPrice = exitFill;
+
+  const fallbackSlippage =
+    Number.isFinite(entrySignal) &&
+    Number.isFinite(entryFill) &&
+    entrySignal > 0
+      ? round(Math.abs(entryFill - entrySignal) / entrySignal, 8)
+      : null;
+
+  const latestOrderLog =
+    Array.isArray(orderRowsForExec) && orderRowsForExec.length
+      ? [...orderRowsForExec].sort((a, b) => Number(a?.ts || 0) - Number(b?.ts || 0)).at(-1)
+      : null;
+
+  const outcome = inferOutcome(exec, signal);
+  const pnlPct = safeNum(exec.pnlPct ?? signal?.pnlPct ?? calcPnlPct(direction, entryFill, exitPrice));
+  const pnlTheoretical = safeNum(
+    exec.pnlTheoretical ??
+      signal?.pnlTheoretical ??
+      (Number.isFinite(entryPlanned) && Number.isFinite(exitPlanned)
+        ? (Math.abs(exec.quantity || 0) > 0
+            ? ((direction === "SHORT" ? entryPlanned - exitPlanned : exitPlanned - entryPlanned) *
+              Number(exec.quantity || 0))
+            : null)
+        : null)
+  );
+  const pnlRealizedGross = safeNum(
+    exec.pnlRealizedGross ??
+      signal?.pnlRealizedGross ??
+      sumRealizedPnlFromFills(closeFills) ??
+      (Number.isFinite(entryFill) &&
+      Number.isFinite(exitPrice) &&
+      Number.isFinite(Number(exec.quantity || 0))
+        ? ((direction === "SHORT" ? entryFill - exitPrice : exitPrice - entryFill) *
+          Number(exec.quantity || 0))
+        : null)
+  );
+  const fees = safeNum(
+    exec.fees ??
+      signal?.fees ??
+      ((sumFeesFromFills(exec.symbol, openFills) || 0) +
+        (sumFeesFromFills(exec.symbol, closeFills) || 0))
+  );
+  const pnlRealizedNet = safeNum(
+    exec.pnlRealizedNet ??
+      signal?.pnlRealizedNet ??
+      (Number.isFinite(pnlRealizedGross)
+        ? pnlRealizedGross - (Number.isFinite(fees) ? fees : 0)
+        : exec.pnlUsd)
+  );
+  const closeReasonExchange =
+    exec.closeReasonExchange ??
+    signal?.closeReasonExchange ??
+    (exec.exchange?.closeOrderId
+      ? exec.exchange?.slOrderId && exec.exchange.closeOrderId === exec.exchange.slOrderId
+        ? "stop_market_filled"
+        : exec.exchange?.tpOrderId && exec.exchange.closeOrderId === exec.exchange.tpOrderId
+        ? "take_profit_market_filled"
+        : "market_close_order"
+      : null);
+  const pnlSource =
+    exec.pnlSource ??
+    signal?.pnlSource ??
+    (closeFills.length ? "binance_fill" : exec.exchange?.closeOrderId ? "order_status" : null);
+
+  return {
+    executionId: exec.id,
+    symbol: exec.symbol ?? null,
+    tf: exec.tf ?? null,
+    side: direction ?? null,
+    strategy: exec.strategy ?? signal?.strategy ?? null,
+
+    signalTs: signal?.ts ?? signal?.signalTs ?? null,
+    signalIso: toIso(signal?.ts ?? signal?.signalTs ?? null),
+    openTs: exec.openedTs ?? null,
+    openIso: toIso(exec.openedTs),
+    closedTs: exec.closedTs ?? null,
+    closedIso: toIso(exec.closedTs),
+
+    statusAtOpen: exec.openedTs ? "OPEN" : null,
+    mode: exec.mode ?? null,
+    source: exec.mode === "binance_real" ? "execution" : "paper_execution",
+
+    entrySignal,
+    entryPlanned,
+    entryFill,
+    entry: entryFill,
+    rawEntry,
+    projectedEntry,
+    entryProjectionAtrMult,
+
+    sl,
+    tp,
+    tpRawAtr: safeNum(signal?.tpRawAtr),
+    tpCappedByResistance: hasValue(signal?.tpCappedByResistance) ? signal.tpCappedByResistance : null,
+    tpDistancePct: calcTpDistancePct(entryFill, tp),
+    tpDistanceAtr: calcTpDistanceAtr(entryFill, tp, atr),
+
+    exitPlanned,
+    exitFill,
+    exitPrice,
+    quantity: safeNum(exec.quantity),
+    grossQuantity: safeNum(exec.exchange?.openExecutedQty ?? exec.quantity),
+    positionUsd: safeNum(exec.positionNotional ?? exec.tradeUsd),
+    tradeUsd: safeNum(exec.tradeUsd),
+    freeQuote: safeNum(signal?.freeQuote),
+
+    score: safeNum(exec.score ?? signal?.score),
+    signalClass: exec.signalClass ?? signal?.signalClass ?? null,
+
+    rsi: safeNum(signal?.rsi),
+    prevRsi: safeNum(signal?.prevRsi),
+    atr,
+    atrPct: safeNum(signal?.atrPct),
+    adx: safeNum(signal?.adx),
+    ema20: safeNum(signal?.ema20),
+    ema50: safeNum(signal?.ema50),
+    ema200: safeNum(signal?.ema200),
+
+    bullish: hasValue(signal?.bullish) ? signal.bullish : null,
+    bullishFast: hasValue(signal?.bullishFast) ? signal.bullishFast : null,
+    nearEma20: hasValue(signal?.nearEma20) ? signal.nearEma20 : null,
+    nearEma50: hasValue(signal?.nearEma50) ? signal.nearEma50 : null,
+    nearPullback: hasValue(signal?.nearPullback) ? signal.nearPullback : null,
+    stackedEma: hasValue(signal?.stackedEma) ? signal.stackedEma : null,
+    rsiInBand: hasValue(signal?.rsiInBand) ? signal.rsiInBand : null,
+    rsiRising: hasValue(signal?.rsiRising) ? signal.rsiRising : null,
+    isTrend: hasValue(signal?.isTrend) ? signal.isTrend : null,
+    isRange: hasValue(signal?.isRange) ? signal.isRange : null,
+    cooldownPassed: hasValue(signal?.cooldownPassed) ? signal.cooldownPassed : null,
+    emaSeparationPct: safeNum(signal?.emaSeparationPct),
+    emaSlopePct: safeNum(signal?.emaSlopePct),
+    distToEma20: safeNum(signal?.distToEma20),
+    distToEma50: safeNum(signal?.distToEma50),
+    entryDiffPctFromLast: safeNum(signal?.entryDiffPctFromLast),
+
+    nearestSupport: safeNum(signal?.nearestSupport),
+    nearestSupportStrength: safeNum(signal?.nearestSupportStrength),
+    nearestSupportTouches: safeNum(signal?.nearestSupportTouches),
+    nearestResistance: safeNum(signal?.nearestResistance),
+    nearestResistanceStrength: safeNum(signal?.nearestResistanceStrength),
+    nearestResistanceTouches: safeNum(signal?.nearestResistanceTouches),
+    srPassed: hasValue(signal?.srPassed) ? signal.srPassed : null,
+    srReason: signal?.srReason ?? null,
+    distanceToSupportAtr: safeNum(signal?.distanceToSupportAtr),
+    distanceToResistanceAtr: safeNum(signal?.distanceToResistanceAtr),
+
+    maxHighDuringTrade: safeNum(signal?.maxHighDuringTrade),
+    minLowDuringTrade: safeNum(signal?.minLowDuringTrade),
+    barsOpen: safeNum(signal?.barsOpen),
+
+    executionAttempted: true,
+    executionApproved: true,
+    executionReason: exec.closeReason ?? null,
+
+    rrPlanned: calcRrPlanned(entryFill, sl, tp),
+    rrRealizedLogged: safeNum(signal?.rrRealized),
+    rrRealized: calcRrRealized(direction, entryFill, sl, exitPrice),
+    outcome,
+    closeReason: exec.closeReason ?? signal?.closeReason ?? null,
+    closeReasonInternal:
+      exec.closeReasonInternal ?? signal?.closeReasonInternal ?? exec.closeReason ?? null,
+    closeReasonExchange,
+    pnlSource,
+    pnlPct,
+    pnlUsd: safeNum(exec.pnlUsd),
+    pnlTheoretical,
+    pnlRealizedGross,
+    fees,
+    pnlRealizedNet,
+
+    commissionRate: safeNum(signal?.commissionRate),
+
+    entryOrderId: exec.exchange?.openOrderId ?? null,
+    entryClientOrderId: exec.exchange?.openClientOrderId ?? null,
+    entryTransactTime: exec.exchange?.openTransactTime ?? null,
+    entryTransactIso: toIso(exec.exchange?.openTransactTime ?? null),
+    entryStatus: exec.exchange?.openStatus ?? null,
+    entryExecutedQty: safeNum(exec.exchange?.openExecutedQty),
+    entryQuoteQty: safeNum(exec.exchange?.openQuoteQty),
+
+    exitOrderId: exec.exchange?.closeOrderId ?? null,
+    exitClientOrderId: exec.exchange?.closeClientOrderId ?? null,
+    exitTransactTime: exec.exchange?.closeTransactTime ?? null,
+    exitTransactIso: toIso(exec.exchange?.closeTransactTime ?? null),
+    exitStatus: exec.exchange?.closeStatus ?? null,
+    exitExecutedQty: safeNum(exec.exchange?.closeExecutedQty),
+    exitQuoteQty: safeNum(exec.exchange?.closeQuoteQty),
+
+    tpAlgoId: exec.exchange?.tpAlgoId ?? null,
+    tpClientAlgoId: exec.exchange?.tpClientAlgoId ?? null,
+    tpOrderId: exec.exchange?.tpOrderId ?? null,
+    tpStopPrice: safeNum(exec.exchange?.tpStopPrice),
+    tpOrderMode: exec.exchange?.tpOrderMode ?? null,
+    slAlgoId: exec.exchange?.slAlgoId ?? null,
+    slClientAlgoId: exec.exchange?.slClientAlgoId ?? null,
+    slOrderId: exec.exchange?.slOrderId ?? null,
+    slStopPrice: safeNum(exec.exchange?.slStopPrice),
+    slOrderMode: exec.exchange?.slOrderMode ?? null,
+    attachedExitsPlaced: hasValue(exec.exchange?.attachedExitsPlaced)
+      ? exec.exchange.attachedExitsPlaced
+      : null,
+    protectionStatus: exec.exchange?.protectionStatus ?? null,
+    attachError: exec.exchange?.attachError ?? null,
+    openFees: safeNum(exec.openFees ?? exec.exchange?.openFees),
+    closeFees: safeNum(exec.closeFees ?? exec.exchange?.closeFees),
+    feesConvertible:
+      hasValue(exec.feesConvertible) ? exec.feesConvertible : null,
+
+    slippagePct: safeNum(metric?.slippagePct ?? fallbackSlippage),
+    latencyInternal: safeNum(metric?.latencyInternal),
+    latencyExchange: safeNum(metric?.latencyExchange),
+    latencyTotal: safeNum(metric?.latencyTotal),
+    execMetricTs: metric?.ts ?? metric?.createdAt ?? null,
+    execMetricIso: toIso(metric?.ts ?? metric?.createdAt ?? null),
+    execMetricMatchDiffMs: safeNum(metric?.matchDiffMs),
+
+    latestOrderLogType: latestOrderLog?.type ?? null,
+    latestOrderLogTs: latestOrderLog?.ts ?? null,
+    latestOrderLogIso: toIso(latestOrderLog?.ts ?? null),
+  };
+}
+
+function main() {
+  const state = readJsonSafe(STATE_FILE, {});
+  const executionMetrics = readJsonSafe(METRICS_FILE, []);
+  const ordersLog = readJsonSafe(ORDERS_LOG_FILE, []);
+
+  const executions = Array.isArray(state.executions)
+    ? state.executions.filter((e) => e && e.status === "CLOSED")
+    : [];
+
+  const signalIndexes = makeSignalIndexes(state);
+  const metricsByExecutionId = buildMetricsIndex(executionMetrics);
+  const orderIndex = buildOrderLogIndex(ordersLog);
+
+  const rows = executions.map((exec) => {
+    const signal = pickBestSignalForExecution(exec, signalIndexes);
+    const metric = metricsByExecutionId.get(exec.id) || null;
+    const orderRowsForExec = orderIndex.byExecutionId.get(exec.id) || [];
+    return buildRow(exec, signal, metric, orderRowsForExec);
+  });
+
+  rows.sort((a, b) => {
+    const ta = Number(a.openTs || a.signalTs || 0);
+    const tb = Number(b.openTs || b.signalTs || 0);
+    return ta - tb;
+  });
+
+  writeJsonSafe(OUTPUT_JSON, rows);
+  writeJsonAtomic(OUTPUT_CSV, toCsv(rows));
+
+  const rrRows = rows.filter((r) => Number.isFinite(Number(r.rrRealized)));
+  const avgRrRealized = rrRows.length ? avg(rrRows.map((r) => Number(r.rrRealized))) : 0;
+
+  const countWith = (field) => rows.filter((r) => hasValue(r[field])).length;
+
+  console.log(`Closed signals: ${Array.isArray(state.closedSignals) ? state.closedSignals.length : 0}`);
+  console.log(
+    `Open execution rows: ${
+      Array.isArray(state.executions)
+        ? state.executions.filter((e) => e && e.status === "OPEN").length
+        : 0
+    }`
+  );
+  console.log(
+    `Close rows: ${
+      Array.isArray(ordersLog)
+        ? ordersLog.filter((r) => String(r?.type || "").includes("close")).length
+        : 0
+    }`
+  );
+  console.log(`Consolidated trades: ${rows.length}`);
+  console.log(`Saved JSON: ${OUTPUT_JSON}`);
+  console.log(`Saved CSV: ${OUTPUT_CSV}`);
+  console.log(`With rrRealized: ${countWith("rrRealized")}`);
+  console.log(`With slippage: ${countWith("slippagePct")}`);
+  console.log(
+    `With SR fields: ${
+      rows.filter((r) => hasValue(r.nearestSupport) || hasValue(r.nearestResistance) || hasValue(r.srPassed)).length
+    }`
+  );
+  console.log(`With tpCappedByResistance: ${countWith("tpCappedByResistance")}`);
+  console.log(`With projectedEntry: ${countWith("projectedEntry")}`);
+  console.log(
+    `With TP distance fields: ${
+      rows.filter((r) => hasValue(r.tpDistancePct) || hasValue(r.tpDistanceAtr)).length
+    }`
+  );
+  console.log(`With strategy: ${countWith("strategy")}`);
+  console.log(`Avg rrRealized: ${avgRrRealized.toFixed(4)}`);
 }
 
 main();

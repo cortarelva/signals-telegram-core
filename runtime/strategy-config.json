@@ -548,7 +548,110 @@
     },
     "ENABLED": true
   },
+  "1000PEPEUSDC": {
+    "TF": "1h",
+    "HTF_TF": "1d",
+    "RSI_MIN": 35,
+    "RSI_MAX": 55,
+    "SL_ATR_MULT": 0.75,
+    "TP_ATR_MULT": 3,
+    "PULLBACK_BAND_ATR": 0.6,
+    "REQUIRE_SR": true,
+    "MIN_SPACE_TO_TARGET_ATR": 0.8,
+    "MAX_DISTANCE_FROM_SUPPORT_ATR": 1.2,
+    "TP_RESISTANCE_BUFFER_ATR": 0.15,
+    "REQUIRE_TREND": false,
+    "MIN_RR_PLANNED": 0.8,
+    "MIN_RR_AFTER_CAP": 0.03,
+    "TREND_REQUIRE_RSI_FALLING": true,
+    "OVERSOLD_BOUNCE": {
+      "enabled": false
+    },
+    "BREAKDOWN_RETEST_SHORT": {
+      "enabled": false
+    },
+    "FAILED_BREAKDOWN": {
+      "enabled": false
+    },
+    "BULL_TRAP": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_SHORT": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_LONG": {
+      "enabled": true
+    },
+    "IGNITION_CONTINUATION_LONG": {
+      "enabled": false
+    },
+    "TREND": {
+      "enabled": false
+    },
+    "TREND_SHORT": {
+      "enabled": false
+    },
+    "ENABLED": true
+  },
   "QQQUSDT": {
+    "TF": "1h",
+    "HTF_TF": "1d",
+    "RSI_MIN": 35,
+    "RSI_MAX": 55,
+    "SL_ATR_MULT": 0.75,
+    "TP_ATR_MULT": 3,
+    "PULLBACK_BAND_ATR": 0.6,
+    "REQUIRE_SR": true,
+    "MIN_SPACE_TO_TARGET_ATR": 0.8,
+    "MAX_DISTANCE_FROM_SUPPORT_ATR": 1.2,
+    "TP_RESISTANCE_BUFFER_ATR": 0.15,
+    "REQUIRE_TREND": false,
+    "MIN_RR_PLANNED": 0.8,
+    "MIN_RR_AFTER_CAP": 0.03,
+    "TREND_REQUIRE_RSI_FALLING": true,
+    "OVERSOLD_BOUNCE": {
+      "enabled": true,
+      "minScore": 55,
+      "minAdx": 0,
+      "maxRsi": 50,
+      "minRsiRecovery": 0.5,
+      "minDropAtr": 0.8,
+      "minBullRecoveryBodyAtr": 0.06,
+      "minRelativeVolume": 0.9,
+      "requireVolume": false,
+      "slAtrMult": 1,
+      "tpAtrMult": 1.4,
+      "minRrAfterCap": 0.6,
+      "minTpPctAfterCap": 0.0007,
+      "minTpAtrAfterCap": 0.3
+    },
+    "BREAKDOWN_RETEST_SHORT": {
+      "enabled": false
+    },
+    "FAILED_BREAKDOWN": {
+      "enabled": false
+    },
+    "BULL_TRAP": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_SHORT": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_LONG": {
+      "enabled": false
+    },
+    "IGNITION_CONTINUATION_LONG": {
+      "enabled": false
+    },
+    "TREND": {
+      "enabled": false
+    },
+    "TREND_SHORT": {
+      "enabled": false
+    },
+    "ENABLED": true
+  },
+  "AAPLUSDT": {
     "TF": "1h",
     "HTF_TF": "1d",
     "RSI_MIN": 35,

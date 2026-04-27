@@ -35,7 +35,8 @@
     "backtest:cipher-short": "BACKTEST_STRATEGIES=cipherContinuationShort node research/backtest-candidate-strategies.js",
     "backtest:cipher-long": "BACKTEST_STRATEGIES=cipherContinuationLong node research/backtest-candidate-strategies.js",
     "compare:real-vs-backtest": "node research/compare-real-vs-backtest.js",
-    "mine:opportunities": "node research/mine-opportunity-events.js"
+    "mine:opportunities": "node research/mine-opportunity-events.js",
+    "predict:next3": "node research/predict-next-3-candles-direction.js"
   },
   "keywords": [],
   "author": "",

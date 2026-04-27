@@ -281,7 +281,7 @@
     "ENABLED": true
   },
   "XRPUSDC": {
-    "TF": "5m",
+    "TF": "1h",
     "HTF_TF": "1d",
     "RSI_MIN": 35,
     "RSI_MAX": 55,
@@ -336,6 +336,9 @@
       "minAdx": 6,
       "requireLtfBullishShift": true
     },
+    "LIQUIDITY_SWEEP_RECLAIM_LONG": {
+      "enabled": true
+    },
     "TREND": {
       "enabled": false
     },
@@ -350,7 +353,7 @@
       "requireRsiFalling": true,
       "maxPullbackPct": 0.025
     },
-    "ENABLED": false
+    "ENABLED": true
   },
   "XAUUSDT": {
     "TF": "1h",

@@ -19,6 +19,9 @@ const {
   evaluateIgnitionContinuationLongStrategy,
 } = require("./ignition-continuation-long-strategy");
 const {
+  evaluateLiquiditySweepReclaimLongStrategy,
+} = require("./liquidity-sweep-reclaim-long-strategy");
+const {
   evaluateFlushReclaimLongStrategy,
 } = require("./flush-reclaim-long-strategy");
 
@@ -80,6 +83,12 @@ function isStrategyEnabled(ctx, strategyKey) {
         "IGNITION_CONTINUATION_LONG",
         "EXPANSION_CONTINUATION_LONG",
       ]).enabled === true;
+    case "LIQUIDITY_SWEEP_RECLAIM_LONG":
+      return getStrategyConfig(ctx, [
+        "LIQUIDITY_SWEEP_RECLAIM_LONG",
+        "LIQUIDITY_SWEEP",
+        "SWEEP_RECLAIM_LONG",
+      ]).enabled === true;
     case "FLUSH_RECLAIM_LONG":
       return getStrategyConfig(ctx, [
         "FLUSH_RECLAIM_LONG",
@@ -130,6 +139,10 @@ const STRATEGY_DESCRIPTORS = [
   {
     key: "IGNITION_CONTINUATION_LONG",
     evaluate: evaluateIgnitionContinuationLongStrategy,
+  },
+  {
+    key: "LIQUIDITY_SWEEP_RECLAIM_LONG",
+    evaluate: evaluateLiquiditySweepReclaimLongStrategy,
   },
   {
     key: "FLUSH_RECLAIM_LONG",

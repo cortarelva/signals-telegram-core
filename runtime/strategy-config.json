@@ -83,6 +83,9 @@
       "tpResistanceBufferAtr": 0.18,
       "minRrAfterCap": 0.8,
       "minTpPctAfterCap": 0.0012
+    },
+    "BREAKDOWN_CONTINUATION_BASE_SHORT": {
+      "enabled": false
     }
   },
   "ETHUSDC": {
@@ -130,7 +133,7 @@
     "ENABLED": false
   },
   "BTCUSDC": {
-    "TF": "15m",
+    "TF": "1h",
     "HTF_TF": "1d",
     "RSI_MIN": 35,
     "RSI_MAX": 55,
@@ -149,7 +152,7 @@
       "enabled": false
     },
     "BREAKDOWN_RETEST_SHORT": {
-      "enabled": false
+      "enabled": true
     },
     "BULL_TRAP": {
       "enabled": false
@@ -158,10 +161,10 @@
       "enabled": false
     },
     "CIPHER_CONTINUATION_LONG": {
-      "enabled": false
+      "enabled": true
     },
     "CIPHER_CONTINUATION_SHORT": {
-      "enabled": false
+      "enabled": true
     },
     "TREND": {
       "enabled": false
@@ -189,7 +192,32 @@
       "tpAtrMult": 1.7,
       "minPlannedRr": 0.7
     },
-    "ENABLED": false
+    "EXTRA_RUNS": [
+      {
+        "id": "btc_bdcb_15m_exploratory",
+        "ENABLED": true,
+        "TF": "15m",
+        "HTF_TF": "1d",
+        "BREAKDOWN_RETEST_SHORT": {
+          "enabled": false
+        },
+        "CIPHER_CONTINUATION_LONG": {
+          "enabled": false
+        },
+        "CIPHER_CONTINUATION_SHORT": {
+          "enabled": false
+        },
+        "BREAKDOWN_CONTINUATION_BASE_SHORT": {
+          "enabled": true,
+          "EXECUTION": {
+            "bucket": "exploratory",
+            "riskPerTrade": 0.0025,
+            "maxPositionUsd": 25
+          }
+        }
+      }
+    ],
+    "ENABLED": true
   },
   "BNBUSDC": {
     "RSI_MIN": 35,
@@ -278,6 +306,25 @@
       "requireRsiFalling": true,
       "maxPullbackPct": 0.03
     },
+    "EXTRA_RUNS": [
+      {
+        "id": "ada_bdcb_15m_exploratory",
+        "ENABLED": true,
+        "TF": "15m",
+        "HTF_TF": "1d",
+        "CIPHER_CONTINUATION_LONG": {
+          "enabled": false
+        },
+        "BREAKDOWN_CONTINUATION_BASE_SHORT": {
+          "enabled": true,
+          "EXECUTION": {
+            "bucket": "exploratory",
+            "riskPerTrade": 0.0025,
+            "maxPositionUsd": 25
+          }
+        }
+      }
+    ],
     "ENABLED": true
   },
   "XRPUSDC": {

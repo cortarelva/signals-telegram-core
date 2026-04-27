@@ -24,6 +24,9 @@ const {
 const {
   evaluateFlushReclaimLongStrategy,
 } = require("./flush-reclaim-long-strategy");
+const {
+  evaluateBreakdownContinuationBaseShortStrategy,
+} = require("./breakdown-continuation-base-short-strategy");
 
 function envBool(name, fallback) {
   const raw = process.env[name];
@@ -94,6 +97,12 @@ function isStrategyEnabled(ctx, strategyKey) {
         "FLUSH_RECLAIM_LONG",
         "EARLY_EXPANSION_RECLAIM_LONG",
       ]).enabled === true;
+    case "BREAKDOWN_CONTINUATION_BASE_SHORT":
+      return getStrategyConfig(ctx, [
+        "BREAKDOWN_CONTINUATION_BASE_SHORT",
+        "BREAKDOWN_CONTINUATION_BASE",
+        "WEAK_BASE_BREAKDOWN_SHORT",
+      ]).enabled === true;
     default:
       return true;
   }
@@ -147,6 +156,10 @@ const STRATEGY_DESCRIPTORS = [
   {
     key: "FLUSH_RECLAIM_LONG",
     evaluate: evaluateFlushReclaimLongStrategy,
+  },
+  {
+    key: "BREAKDOWN_CONTINUATION_BASE_SHORT",
+    evaluate: evaluateBreakdownContinuationBaseShortStrategy,
   },
 ];
 

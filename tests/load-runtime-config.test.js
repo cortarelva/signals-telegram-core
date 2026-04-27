@@ -38,6 +38,16 @@ test("loadRuntimeConfigFiles merges DEFAULTS and adaptive trendShort overrides",
           BULL_TRAP: {
             enabled: true,
           },
+          EXTRA_RUNS: [
+            {
+              id: "eth_short_15m",
+              ENABLED: true,
+              TF: "15m",
+              BREAKDOWN_RETEST_SHORT: {
+                enabled: true,
+              },
+            },
+          ],
           TREND: {
             enabled: true,
             allow15m: true,
@@ -91,6 +101,9 @@ test("loadRuntimeConfigFiles merges DEFAULTS and adaptive trendShort overrides",
   assert.equal(config.ETHUSDC.TREND_SHORT.requireNearPullback, true);
   assert.equal(config.ETHUSDC.TREND_SHORT.rsiMax, 52);
   assert.equal(config.ETHUSDC.TREND_SHORT.minAdx, 21);
+  assert.equal(Array.isArray(config.ETHUSDC.EXTRA_RUNS), true);
+  assert.equal(config.ETHUSDC.EXTRA_RUNS[0].TF, "15m");
+  assert.equal(config.ETHUSDC.EXTRA_RUNS[0].BREAKDOWN_RETEST_SHORT.enabled, true);
   assert.equal(config.XRPUSDC.ENABLED, false);
   assert.equal(config.XRPUSDC.BULL_TRAP.enabled, false);
 });

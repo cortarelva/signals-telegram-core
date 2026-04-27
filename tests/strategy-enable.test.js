@@ -166,10 +166,39 @@ test("evaluateAllStrategies only evaluates enabled strategies", () => {
       CIPHER_CONTINUATION_LONG: { enabled: false },
       CIPHER_CONTINUATION_SHORT: { enabled: true },
       IGNITION_CONTINUATION_LONG: { enabled: false },
+      BREAKDOWN_CONTINUATION_BASE_SHORT: { enabled: false },
     },
   });
 
   assert.equal(result.all.length, 1);
   assert.equal(result.all[0].strategy, "cipherContinuationShort");
   assert.equal(result.blockedReason, "cipherContinuationShort:not_enough_context");
+});
+
+test("evaluateAllStrategies can enable breakdownContinuationBaseShort explicitly", () => {
+  const result = evaluateAllStrategies({
+    candles: [],
+    helpers: {
+      paperMinScore: 70,
+    },
+    cfg: {
+      TREND: { enabled: false },
+      TREND_SHORT: { enabled: false },
+      BREAKDOWN_RETEST_SHORT: { enabled: false },
+      BULL_TRAP: { enabled: false },
+      FAILED_BREAKDOWN: { enabled: false },
+      MOMENTUM_BREAKOUT_LONG: { enabled: false },
+      CIPHER_CONTINUATION_LONG: { enabled: false },
+      CIPHER_CONTINUATION_SHORT: { enabled: false },
+      IGNITION_CONTINUATION_LONG: { enabled: false },
+      BREAKDOWN_CONTINUATION_BASE_SHORT: { enabled: true },
+    },
+  });
+
+  assert.equal(result.all.length, 1);
+  assert.equal(result.all[0].strategy, "breakdownContinuationBaseShort");
+  assert.equal(
+    result.blockedReason,
+    "breakdownContinuationBaseShort:not_enough_context"
+  );
 });

@@ -42,3 +42,40 @@ test("paperExecute rejects long signals with stop above entry", async () => {
   assert.equal(result.executed, false);
   assert.equal(result.reason, "invalid_stop_geometry");
 });
+
+test("paperExecute applies per-strategy risk override to sizing", async () => {
+  const result = await paperExecute(
+    {
+      symbol: "ADAUSDC",
+      tf: "15m",
+      direction: "SHORT",
+      side: "SELL",
+      entry: 100,
+      sl: 101,
+      tp: 98,
+      strategy: "breakdownContinuationBaseShort",
+      score: 88,
+      signalClass: "EXECUTABLE",
+      executionBucket: "exploratory",
+      executionRiskPerTrade: 0.0025,
+      executionMaxPositionUsd: 25,
+    },
+    { executions: [] },
+    {
+      minScore: 70,
+      allowedClasses: ["EXECUTABLE"],
+      maxOpenTradesTotal: 5,
+      maxOpenTradesPerSymbol: 1,
+      allowedSymbols: ["ADAUSDC"],
+      accountSize: 1000,
+      riskPerTrade: 0.0025,
+      maxPositionUsd: 25,
+    }
+  );
+
+  assert.equal(result.executed, true);
+  assert.equal(result.order.executionBucket, "exploratory");
+  assert.equal(result.order.riskPerTrade, 0.0025);
+  assert.equal(result.order.positionNotional, 25);
+  assert.equal(result.order.riskUsd, 0.25);
+});

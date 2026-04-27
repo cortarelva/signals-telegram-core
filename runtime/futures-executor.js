@@ -1046,6 +1046,9 @@ async function applyFuturesSymbolSettings(symbol, leverage) {
 
 function buildBaseExecution(signalObj, sizing, options = {}) {
   const leverage = Number(options.leverage || FUTURES_DEFAULT_LEVERAGE);
+  const riskPerTrade = Number(
+    options.riskPerTrade ?? signalObj.executionRiskPerTrade ?? FUTURES_RISK_PER_TRADE
+  );
 
   return {
     id: makeExecutionId(
@@ -1064,6 +1067,8 @@ function buildBaseExecution(signalObj, sizing, options = {}) {
     invertedSignal: Boolean(signalObj.invertedSignal),
     signalClass: signalObj.signalClass,
     score: signalObj.score,
+    riskPerTrade: Number.isFinite(riskPerTrade) ? round(riskPerTrade, 6) : null,
+    executionBucket: signalObj.executionBucket || null,
 
     side: getOpenOrderSide(signalObj.direction),
     entry: Number(signalObj.entry),
@@ -1886,6 +1891,15 @@ async function closeRealFuturesPosition(execution, closeReason, exitPriceRef = n
 
 async function paperExecute(signalObj, state, options = {}) {
   const executionSignal = normalizeSignalForExecution(signalObj);
+  const accountSize = Number(options.accountSize || ACCOUNT_SIZE);
+  const riskPerTrade = Number(
+    options.riskPerTrade || executionSignal.executionRiskPerTrade || FUTURES_RISK_PER_TRADE
+  );
+  const maxPositionUsd = Number(
+    options.maxPositionUsd ||
+      executionSignal.executionMaxPositionUsd ||
+      FUTURES_MAX_POSITION_USDT
+  );
 
   if (executionSignal?.invertedSignal) {
     console.log(
@@ -1904,9 +1918,9 @@ async function paperExecute(signalObj, state, options = {}) {
 
   const approval = canExecute(executionSignal, state, {
     ...options,
-    accountSize: Number(options.accountSize || ACCOUNT_SIZE),
-    riskPerTrade: Number(options.riskPerTrade || FUTURES_RISK_PER_TRADE),
-    maxPositionUsd: Number(options.maxPositionUsd || FUTURES_MAX_POSITION_USDT),
+    accountSize,
+    riskPerTrade,
+    maxPositionUsd,
   });
   if (!approval.ok) {
     return {
@@ -1924,8 +1938,8 @@ async function paperExecute(signalObj, state, options = {}) {
       : null;
 
   let sizing = calcPositionSizeByRisk({
-    accountSize: ACCOUNT_SIZE,
-    riskPerTrade: FUTURES_RISK_PER_TRADE,
+    accountSize,
+    riskPerTrade,
     entry: executionSignal.entry,
     sl: executionSignal.sl,
     leverage,
@@ -1944,7 +1958,7 @@ async function paperExecute(signalObj, state, options = {}) {
     entry: executionSignal.entry,
     leverage,
     availableBalance,
-    maxPositionUsd: FUTURES_MAX_POSITION_USDT,
+    maxPositionUsd,
   });
 
   if (!sizing) {
@@ -1981,7 +1995,7 @@ async function paperExecute(signalObj, state, options = {}) {
         availableBalance,
         4
       )} accountRef=${round(
-        ACCOUNT_SIZE,
+        accountSize,
         4
       )} riskUsd=${round(
         sizing.riskUsd,
@@ -1996,7 +2010,10 @@ async function paperExecute(signalObj, state, options = {}) {
     );
   }
 
-  let execution = buildBaseExecution(executionSignal, sizing, { leverage });
+  let execution = buildBaseExecution(executionSignal, sizing, {
+    leverage,
+    riskPerTrade,
+  });
   execution.entryFill = execution.entry;
   execution.entryPlanned = execution.entry;
 

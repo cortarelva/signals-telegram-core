@@ -40,6 +40,9 @@ const {
   evaluateCompressionBreakdownShortStrategy,
 } = require("../strategies/compression-breakdown-short-strategy");
 const {
+  evaluateBreakdownContinuationBaseShortStrategy,
+} = require("../strategies/breakdown-continuation-base-short-strategy");
+const {
   evaluateImpulseBreakoutLongStrategy,
 } = require("../strategies/impulse-breakout-long-strategy");
 const {
@@ -841,6 +844,11 @@ const STRATEGY_REGISTRY = [
     name: "compressionBreakdownShort",
     direction: "SHORT",
     evaluate: (ctx) => evaluateCompressionBreakdownShortStrategy(ctx),
+  },
+  {
+    name: "breakdownContinuationBaseShort",
+    direction: "SHORT",
+    evaluate: (ctx) => evaluateBreakdownContinuationBaseShortStrategy(ctx),
   },
   {
     name: "impulseBreakoutLong",

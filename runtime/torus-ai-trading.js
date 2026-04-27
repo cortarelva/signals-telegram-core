@@ -36,11 +36,116 @@ const {
 // Config
 // =========================
 
-function getEnabledSymbols() {
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function mergeRunConfig(baseConfig = {}, runConfig = {}) {
+  const merged = {
+    ...(isPlainObject(baseConfig) ? baseConfig : {}),
+    ...(isPlainObject(runConfig) ? runConfig : {}),
+  };
+
+  for (const [key, baseValue] of Object.entries(baseConfig || {})) {
+    const runValue = runConfig?.[key];
+    if (isPlainObject(baseValue) || isPlainObject(runValue)) {
+      merged[key] = {
+        ...(isPlainObject(baseValue) ? baseValue : {}),
+        ...(isPlainObject(runValue) ? runValue : {}),
+      };
+    }
+  }
+
+  return merged;
+}
+
+function getEnabledSymbolRuns() {
   const strategyConfig = loadRuntimeConfig();
-  return Object.keys(strategyConfig).filter(
-    (symbol) => strategyConfig[symbol]?.ENABLED && isLiveSymbolAllowed(symbol)
-  );
+  const runs = [];
+
+  for (const [symbol, symbolConfig] of Object.entries(strategyConfig)) {
+    if (!symbolConfig?.ENABLED || !isLiveSymbolAllowed(symbol)) continue;
+
+    runs.push({
+      symbol,
+      cfg: symbolConfig,
+      runId: null,
+      runLabel: symbol,
+      isExploratory: false,
+    });
+
+    const extraRuns = Array.isArray(symbolConfig.EXTRA_RUNS)
+      ? symbolConfig.EXTRA_RUNS
+      : [];
+
+    for (const extraRun of extraRuns) {
+      const enabled = extraRun?.enabled === true || extraRun?.ENABLED === true;
+      if (!enabled) continue;
+
+      const runId =
+        String(extraRun.id || extraRun.name || extraRun.label || "")
+          .trim()
+          .replace(/\s+/g, "_") || `extra_${runs.length + 1}`;
+      const mergedCfg = mergeRunConfig(symbolConfig, extraRun);
+
+      runs.push({
+        symbol,
+        cfg: mergedCfg,
+        runId,
+        runLabel: `${symbol}:${runId}`,
+        isExploratory: true,
+      });
+    }
+  }
+
+  return runs;
+}
+
+function getEnabledSymbols() {
+  return Array.from(new Set(getEnabledSymbolRuns().map((run) => run.symbol)));
+}
+
+const STRATEGY_CONFIG_KEY_BY_NAME = {
+  trend: "TREND",
+  trendShort: "TREND_SHORT",
+  breakdownRetestShort: "BREAKDOWN_RETEST_SHORT",
+  bullTrap: "BULL_TRAP",
+  failedBreakdown: "FAILED_BREAKDOWN",
+  oversoldBounce: "OVERSOLD_BOUNCE",
+  momentumBreakoutLong: "MOMENTUM_BREAKOUT_LONG",
+  cipherContinuationLong: "CIPHER_CONTINUATION_LONG",
+  cipherContinuationShort: "CIPHER_CONTINUATION_SHORT",
+  ignitionContinuationLong: "IGNITION_CONTINUATION_LONG",
+  liquiditySweepReclaimLong: "LIQUIDITY_SWEEP_RECLAIM_LONG",
+  flushReclaimLong: "FLUSH_RECLAIM_LONG",
+  breakdownContinuationBaseShort: "BREAKDOWN_CONTINUATION_BASE_SHORT",
+};
+
+function toPositiveNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function getStrategyExecutionOverrides(cfg = {}, strategyName) {
+  const strategyKey = STRATEGY_CONFIG_KEY_BY_NAME[strategyName] || null;
+  const strategyCfg =
+    strategyKey && isPlainObject(cfg?.[strategyKey]) ? cfg[strategyKey] : {};
+  const executionCfg = isPlainObject(strategyCfg?.EXECUTION)
+    ? strategyCfg.EXECUTION
+    : {};
+
+  return {
+    strategyKey,
+    executionBucket: String(
+      executionCfg.bucket || strategyCfg.executionBucket || "core"
+    ).toLowerCase(),
+    riskPerTrade: toPositiveNumber(
+      executionCfg.riskPerTrade ?? strategyCfg.riskPerTrade
+    ),
+    maxPositionUsd: toPositiveNumber(
+      executionCfg.maxPositionUsd ?? strategyCfg.maxPositionUsd
+    ),
+  };
 }
 
 const TF = process.env.TF || "15m";
@@ -104,7 +209,7 @@ const PAPER_MAX_OPEN_TRADES_PER_SYMBOL = Number(
 const CONTINUATION_RANKER_ENABLED =
   String(process.env.CONTINUATION_RANKER_ENABLED || "1") === "1";
 const CONTINUATION_RANKER_MAX_PER_CYCLE = Number(
-  process.env.CONTINUATION_RANKER_MAX_PER_CYCLE || 1
+  process.env.CONTINUATION_RANKER_MAX_PER_CYCLE || 2
 );
 
 const EXECUTION_MODE = String(process.env.EXECUTION_MODE || "paper").toLowerCase();
@@ -931,6 +1036,7 @@ async function executePreparedSignal(candidate, state) {
     tp,
     rawTp,
     tpCappedByResistance,
+    executionOverrides,
   } = candidate;
 
   if (candidate.continuationRank) {
@@ -949,16 +1055,17 @@ async function executePreparedSignal(candidate, state) {
     `[EXECUTOR_CALL] ${symbol} strategy=${selectedStrategy} class=${selectedSignalClass} ` +
       `score=${selectedScore} entry=${entry} tp=${tp} rawTp=${rawTp} capped=${tpCappedByResistance} ` +
       `meta=${signalObj.metaModelApplied ? round(signalObj.metaModelProbability || 0, 4) : "na"} ` +
+      `bucket=${signalObj.executionBucket || "core"} risk=${round(
+        Number(signalObj.executionRiskPerTrade || 0),
+        4
+      ) || "default"} ` +
       `rank=${candidate.continuationRank ?? "-"} rankScore=${round(
         candidate.continuationRankScore ?? 0,
         2
       )}`
   );
 
-  const currentStrategyConfig = loadRuntimeConfig();
-  const allowedSymbols = Object.keys(currentStrategyConfig).filter(
-    (s) => currentStrategyConfig[s]?.ENABLED
-  );
+  const allowedSymbols = getEnabledSymbols();
 
   const execResult = await futuresExecutor.paperExecute(signalObj, state, {
     minScore: selectedMinScore,
@@ -966,6 +1073,12 @@ async function executePreparedSignal(candidate, state) {
     maxOpenTradesTotal: PAPER_MAX_OPEN_TRADES_TOTAL,
     maxOpenTradesPerSymbol: PAPER_MAX_OPEN_TRADES_PER_SYMBOL,
     allowedSymbols,
+    ...(Number.isFinite(Number(executionOverrides?.riskPerTrade))
+      ? { riskPerTrade: Number(executionOverrides.riskPerTrade) }
+      : {}),
+    ...(Number.isFinite(Number(executionOverrides?.maxPositionUsd))
+      ? { maxPositionUsd: Number(executionOverrides.maxPositionUsd) }
+      : {}),
   });
 
   if (execResult.executed) {
@@ -1028,12 +1141,16 @@ async function executePreparedSignal(candidate, state) {
 // Core per symbol
 // =========================
 
-async function processSymbol(symbol, state) {
+async function processSymbol(symbolInput, state) {
+  const run =
+    typeof symbolInput === "string" ? { symbol: symbolInput } : symbolInput || {};
+  const symbol = String(run.symbol || symbolInput || "");
   const strategyConfig = loadRuntimeConfig();
-  const cfg = strategyConfig[symbol];
+  const cfg = run.cfg || strategyConfig[symbol];
+  const runLabel = run.runLabel || symbol;
 
   if (!cfg || !cfg.ENABLED) {
-    console.log(`[ADAPTIVE] ${symbol} disabled by runtime config`);
+    console.log(`[ADAPTIVE] ${runLabel} disabled by runtime config`);
     return;
   }
 
@@ -1044,7 +1161,7 @@ async function processSymbol(symbol, state) {
   const symbolCooldownMins = Number(cfg.COOLDOWN_MINS || COOLDOWN_MINS);
 
   console.log(
-    `[CORE] ${symbol} TF=${symbolTf} limit=${symbolLimit} HTF=${symbolHtfTf} (futures-ready)`
+    `[CORE] ${runLabel} TF=${symbolTf} limit=${symbolLimit} HTF=${symbolHtfTf} (futures-ready)`
   );
 
   const candles = await fetchKlines(symbol, symbolTf, symbolLimit);
@@ -1442,6 +1559,10 @@ async function processSymbol(symbol, state) {
     strategyCandidates,
     "cipherContinuationShort"
   );
+  const breakdownContinuationBaseShortCandidate = extractCandidate(
+    strategyCandidates,
+    "breakdownContinuationBaseShort"
+  );
 
   const rangeScore = rangeCandidate?.score ?? null;
   const rangeSignalClass = rangeCandidate?.signalClass ?? null;
@@ -1478,6 +1599,12 @@ async function processSymbol(symbol, state) {
   const cipherContinuationShortSignalClass =
     cipherContinuationShortCandidate?.signalClass ?? null;
   const cipherContinuationShortAllowed = !!cipherContinuationShortCandidate?.allowed;
+  const breakdownContinuationBaseShortScore =
+    breakdownContinuationBaseShortCandidate?.score ?? null;
+  const breakdownContinuationBaseShortSignalClass =
+    breakdownContinuationBaseShortCandidate?.signalClass ?? null;
+  const breakdownContinuationBaseShortAllowed =
+    !!breakdownContinuationBaseShortCandidate?.allowed;
 
   let selectedStrategy = selected?.strategy || null;
   let selectedDirection = String(selected?.direction || "LONG").toUpperCase();
@@ -1491,6 +1618,7 @@ async function processSymbol(symbol, state) {
   let tpCappedByResistance = selected?.tpCappedByResistance ?? false;
   let blockedReason = strategyDecision.blockedReason || "selected";
   const activeSrEval = selectedDirection === "SHORT" ? srEvalShort : srEval;
+  const executionOverrides = getStrategyExecutionOverrides(cfg, selectedStrategy);
 
   if (!Array.isArray(state.signalLog)) {
     state.signalLog = [];
@@ -1528,6 +1656,9 @@ async function processSymbol(symbol, state) {
     cipherContinuationShortScore,
     cipherContinuationShortSignalClass,
     cipherContinuationShortAllowed,
+    breakdownContinuationBaseShortScore,
+    breakdownContinuationBaseShortSignalClass,
+    breakdownContinuationBaseShortAllowed,
     selectedStrategy,
     selectedDirection,
     selectedEntry: selected?.entry ?? null,
@@ -1574,6 +1705,9 @@ async function processSymbol(symbol, state) {
     executionApproved: false,
     executionReason: null,
     executionOrderId: null,
+    executionBucket: executionOverrides.executionBucket,
+    executionRiskPerTrade: executionOverrides.riskPerTrade,
+    executionMaxPositionUsd: executionOverrides.maxPositionUsd,
     avgVol,
     strategyCandidates,
   });
@@ -1586,7 +1720,7 @@ async function processSymbol(symbol, state) {
 
   console.log(
       `[SIGNAL] ${symbol} ${symbolTf} strategy=${selectedStrategy || "none"} ` +
-      `rangeScore=${rangeScore ?? "-"} trendScore=${trendScore ?? "-"} bounceScore=${bounceScore ?? "-"} failedBreakdownScore=${failedBreakdownScore ?? "-"} momentumBreakoutScore=${momentumBreakoutLongScore ?? "-"} cipherLongScore=${cipherContinuationLongScore ?? "-"} ignitionLongScore=${ignitionContinuationLongScore ?? "-"} cipherShortScore=${cipherContinuationShortScore ?? "-"} ` +
+      `rangeScore=${rangeScore ?? "-"} trendScore=${trendScore ?? "-"} bounceScore=${bounceScore ?? "-"} failedBreakdownScore=${failedBreakdownScore ?? "-"} momentumBreakoutScore=${momentumBreakoutLongScore ?? "-"} cipherLongScore=${cipherContinuationLongScore ?? "-"} ignitionLongScore=${ignitionContinuationLongScore ?? "-"} cipherShortScore=${cipherContinuationShortScore ?? "-"} bdcbShortScore=${breakdownContinuationBaseShortScore ?? "-"} ` +
       `class=${visibleSignalClass} decision=${blockedReason} ` +
       `bullish=${bullish} pullback=${nearPullback} sr=${activeSrEval.reason}`
   );
@@ -1595,7 +1729,7 @@ async function processSymbol(symbol, state) {
   if (!selectedStrategy) {
     console.log(
       `[STRATEGY] ${symbol} sem setup válido. ` +
-        `range=${rangeAllowed} trend=${trendAllowed} bounce=${bounceAllowed} failedBreakdown=${failedBreakdownAllowed} momentumBreakout=${momentumBreakoutLongAllowed} cipherLong=${cipherContinuationLongAllowed} ignitionLong=${ignitionContinuationLongAllowed} cipherShort=${cipherContinuationShortAllowed} reason=${blockedReason}`
+        `range=${rangeAllowed} trend=${trendAllowed} bounce=${bounceAllowed} failedBreakdown=${failedBreakdownAllowed} momentumBreakout=${momentumBreakoutLongAllowed} cipherLong=${cipherContinuationLongAllowed} ignitionLong=${ignitionContinuationLongAllowed} cipherShort=${cipherContinuationShortAllowed} bdcbShort=${breakdownContinuationBaseShortAllowed} reason=${blockedReason}`
     );
     markCurrentClosedCandleProcessed();
     saveState(state);
@@ -1715,6 +1849,9 @@ async function processSymbol(symbol, state) {
     rrRealized: null,
     score: selectedScore,
     signalClass: selectedSignalClass,
+    executionBucket: executionOverrides.executionBucket,
+    executionRiskPerTrade: executionOverrides.riskPerTrade,
+    executionMaxPositionUsd: executionOverrides.maxPositionUsd,
   };
 
   if (!shouldSendSignal(state, signalObj, symbolCooldownMins)) {
@@ -1815,6 +1952,7 @@ async function processSymbol(symbol, state) {
       tpCappedByResistance,
       signalObj,
       lastSignalLogEntry,
+      executionOverrides,
     },
   };
 }
@@ -1825,20 +1963,22 @@ async function processSymbol(symbol, state) {
 
 async function main() {
   const state = loadState();
-  const enabledSymbols = getEnabledSymbols();
+  const enabledRuns = getEnabledSymbolRuns();
   const preparedCandidates = [];
 
-  console.log(`[CORE] enabled symbols: ${enabledSymbols.join(", ") || "none"}`);
+  console.log(
+    `[CORE] enabled runs: ${enabledRuns.map((run) => run.runLabel).join(", ") || "none"}`
+  );
 
-  for (const symbol of enabledSymbols) {
+  for (const run of enabledRuns) {
     try {
-      const result = await processSymbol(symbol, state);
+      const result = await processSymbol(run, state);
       if (result?.candidate) {
         preparedCandidates.push(result.candidate);
       }
     } catch (err) {
       console.error(
-        `[CORE] erro em ${symbol}:`,
+        `[CORE] erro em ${run.runLabel || run.symbol}:`,
         err.response?.data || err.message || err
       );
     }
@@ -1876,6 +2016,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  getEnabledSymbolRuns,
   getEnabledSymbols,
   loadState,
   saveState,

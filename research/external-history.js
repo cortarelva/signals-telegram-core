@@ -1,5 +1,7 @@
 require("dotenv").config();
 
+const fs = require("fs");
+const path = require("path");
 const axios = require("axios");
 
 const { getBaseAsset, isTradFiSymbol } = require("../runtime/symbol-universe");
@@ -13,6 +15,12 @@ const DEFAULT_TWELVE_MIN_INTERVAL_MS = Number(
 const DEFAULT_TWELVE_RATE_LIMIT_BACKOFF_MS = Number(
   process.env.TWELVE_DATA_RATE_LIMIT_BACKOFF_MS || 65000
 );
+const DEFAULT_TWELVE_DAILY_LIMIT_BACKOFF_MS = Number(
+  process.env.TWELVE_DATA_DAILY_LIMIT_BACKOFF_MS || 6 * 60 * 60 * 1000
+);
+const EXTERNAL_HISTORY_CACHE_DIR =
+  process.env.EXTERNAL_HISTORY_CACHE_DIR ||
+  path.join(__dirname, "cache", "external-history");
 const DEFAULT_MAP = {
   AAPLUSDT: "AAPL",
   AMZNUSDT: "AMZN",
@@ -78,6 +86,8 @@ const TWELVE_INTERVALS = {
 
 let twelveDataRequestChain = Promise.resolve();
 let twelveDataLastRequestAt = 0;
+const externalHistoryCache = new Map();
+const externalHistoryRetryState = new Map();
 
 function parseJsonObject(raw) {
   if (!raw || typeof raw !== "string") return {};
@@ -133,6 +143,149 @@ function intervalToMs(interval) {
           : 7 * 24 * 60 * 60 * 1000;
 
   return count * unitMs;
+}
+
+function ensureExternalHistoryCacheDir() {
+  fs.mkdirSync(EXTERNAL_HISTORY_CACHE_DIR, { recursive: true });
+}
+
+function safeSlug(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function buildExternalHistoryCacheKey(providerName, symbol, interval, ticker = null) {
+  return [
+    safeSlug(providerName || "provider"),
+    safeSlug(symbol || "symbol"),
+    safeSlug(interval || "interval"),
+    safeSlug(ticker || symbol || "ticker"),
+  ].join("|");
+}
+
+function getExternalHistoryCacheFile(cacheKey) {
+  ensureExternalHistoryCacheDir();
+  return path.join(EXTERNAL_HISTORY_CACHE_DIR, `${safeSlug(cacheKey)}.json`);
+}
+
+function getExternalHistoryRetryFile(cacheKey) {
+  ensureExternalHistoryCacheDir();
+  return path.join(EXTERNAL_HISTORY_CACHE_DIR, `${safeSlug(cacheKey)}.retry.json`);
+}
+
+function writeExternalHistoryCache(cacheKey, rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+
+  const payload = {
+    updatedAt: Date.now(),
+    rows,
+  };
+
+  externalHistoryCache.set(cacheKey, payload);
+  fs.writeFileSync(getExternalHistoryCacheFile(cacheKey), JSON.stringify(payload, null, 2), "utf8");
+  return payload;
+}
+
+function readExternalHistoryCache(cacheKey) {
+  if (externalHistoryCache.has(cacheKey)) {
+    return externalHistoryCache.get(cacheKey);
+  }
+
+  const file = getExternalHistoryCacheFile(cacheKey);
+  if (!fs.existsSync(file)) return null;
+
+  try {
+    const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+    if (!payload || !Array.isArray(payload.rows) || payload.rows.length === 0) {
+      return null;
+    }
+    externalHistoryCache.set(cacheKey, payload);
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+function writeExternalHistoryRetryState(cacheKey, state) {
+  if (!state || !Number.isFinite(Number(state.retryAt)) || Number(state.retryAt) <= 0) {
+    return null;
+  }
+
+  const payload = {
+    updatedAt: Date.now(),
+    retryAt: Number(state.retryAt),
+    reason: state.reason ? String(state.reason) : "",
+  };
+
+  externalHistoryRetryState.set(cacheKey, payload);
+  fs.writeFileSync(getExternalHistoryRetryFile(cacheKey), JSON.stringify(payload, null, 2), "utf8");
+  return payload;
+}
+
+function readExternalHistoryRetryState(cacheKey) {
+  if (externalHistoryRetryState.has(cacheKey)) {
+    return externalHistoryRetryState.get(cacheKey);
+  }
+
+  const file = getExternalHistoryRetryFile(cacheKey);
+  if (!fs.existsSync(file)) return null;
+
+  try {
+    const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+    if (!payload || !Number.isFinite(Number(payload.retryAt)) || Number(payload.retryAt) <= 0) {
+      return null;
+    }
+    const normalized = {
+      updatedAt: Number(payload.updatedAt || 0),
+      retryAt: Number(payload.retryAt),
+      reason: payload.reason ? String(payload.reason) : "",
+    };
+    externalHistoryRetryState.set(cacheKey, normalized);
+    return normalized;
+  } catch {
+    return null;
+  }
+}
+
+function clearExternalHistoryRetryState(cacheKey) {
+  externalHistoryRetryState.delete(cacheKey);
+  const file = getExternalHistoryRetryFile(cacheKey);
+  if (fs.existsSync(file)) {
+    fs.unlinkSync(file);
+  }
+}
+
+function getCacheFreshUntilMs(rows, interval) {
+  const intervalMs = intervalToMs(interval);
+  if (!intervalMs || !Array.isArray(rows) || rows.length === 0) return 0;
+  const latest = rows[rows.length - 1];
+  const latestCloseTime = Number(latest?.closeTime || 0);
+  if (!Number.isFinite(latestCloseTime) || latestCloseTime <= 0) return 0;
+  return latestCloseTime + intervalMs;
+}
+
+function getCachedExternalHistoryRows(cacheKey, interval, total, options = {}) {
+  const payload = readExternalHistoryCache(cacheKey);
+  if (!payload || !Array.isArray(payload.rows) || payload.rows.length === 0) return null;
+
+  const nowMs = Number(options.nowMs || Date.now());
+  const allowStale = options.allowStale === true;
+  const freshUntilMs = getCacheFreshUntilMs(payload.rows, interval);
+
+  if (!allowStale && freshUntilMs > 0 && nowMs >= freshUntilMs) {
+    return null;
+  }
+
+  const rows = payload.rows.slice(-Math.min(Number(total || payload.rows.length), payload.rows.length));
+  return {
+    rows,
+    updatedAt: Number(payload.updatedAt || 0),
+    freshUntilMs,
+    stale: freshUntilMs > 0 ? nowMs >= freshUntilMs : false,
+  };
 }
 
 function pickTwelveDataSymbol(symbol, env = process.env) {
@@ -247,10 +400,51 @@ function getTwelveDataRateLimitBackoffMs(env = process.env) {
     : DEFAULT_TWELVE_RATE_LIMIT_BACKOFF_MS;
 }
 
+function getTwelveDataDailyLimitBackoffMs(env = process.env) {
+  const value = Number(
+    env.TWELVE_DATA_DAILY_LIMIT_BACKOFF_MS || DEFAULT_TWELVE_DAILY_LIMIT_BACKOFF_MS
+  );
+  return Number.isFinite(value) && value > 0
+    ? value
+    : DEFAULT_TWELVE_DAILY_LIMIT_BACKOFF_MS;
+}
+
 function isTwelveDataRateLimitPayload(payload) {
   if (!payload || typeof payload !== "object") return false;
   const message = String(payload.message || "").toLowerCase();
   return Number(payload.code) === 429 || message.includes("run out of api credits");
+}
+
+function isTwelveDataDailyCreditPayload(payload) {
+  if (!payload || typeof payload !== "object") return false;
+  const message = String(payload.message || "").toLowerCase();
+  return message.includes("for the day") || message.includes("daily limits");
+}
+
+function getNextUtcMidnightMs(nowMs = Date.now()) {
+  const now = new Date(nowMs);
+  return Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() + 1,
+    0,
+    0,
+    0,
+    0
+  );
+}
+
+function resolveTwelveDataRetryAtMs(payload, env = process.env, nowMs = Date.now()) {
+  if (!isTwelveDataRateLimitPayload(payload)) return 0;
+
+  if (isTwelveDataDailyCreditPayload(payload)) {
+    return Math.max(
+      getNextUtcMidnightMs(nowMs),
+      nowMs + getTwelveDataDailyLimitBackoffMs(env)
+    );
+  }
+
+  return nowMs + getTwelveDataRateLimitBackoffMs(env);
 }
 
 function runTwelveDataRateLimited(task, options = {}) {
@@ -330,14 +524,30 @@ async function fetchTwelveDataBatch({
   if (firstParsed.ok) return firstParsed.payload.values;
 
   if (isTwelveDataRateLimitPayload(firstParsed.payload)) {
+    if (isTwelveDataDailyCreditPayload(firstParsed.payload)) {
+      const error = new Error(
+        `twelvedata_request_failed:${describeTwelveDataError(firstParsed.payload)}`
+      );
+      error.payload = firstParsed.payload;
+      throw error;
+    }
+
     await sleep(getTwelveDataRateLimitBackoffMs(env));
     const retryResponse = await runTwelveDataRateLimited(request, { env, sleep, now });
     const retryParsed = parseResponse(retryResponse);
     if (retryParsed.ok) return retryParsed.payload.values;
-    throw new Error(`twelvedata_request_failed:${describeTwelveDataError(retryParsed.payload)}`);
+    const error = new Error(
+      `twelvedata_request_failed:${describeTwelveDataError(retryParsed.payload)}`
+    );
+    error.payload = retryParsed.payload;
+    throw error;
   }
 
-  throw new Error(`twelvedata_request_failed:${describeTwelveDataError(firstParsed.payload)}`);
+  const error = new Error(
+    `twelvedata_request_failed:${describeTwelveDataError(firstParsed.payload)}`
+  );
+  error.payload = firstParsed.payload;
+  throw error;
 }
 
 async function fetchKlinesFromTwelveData(symbol, interval, total, options = {}) {
@@ -354,53 +564,114 @@ async function fetchKlinesFromTwelveData(symbol, interval, total, options = {}) 
     throw new Error(`unsupported_twelvedata_symbol_or_interval:${symbol}:${interval}`);
   }
 
+  const nowMs = Number(
+    typeof options.now === "function" ? options.now() : options.nowMs || Date.now()
+  );
+  const cacheKey = buildExternalHistoryCacheKey("twelvedata", symbol, interval, ticker);
+  const freshCache = getCachedExternalHistoryRows(
+    cacheKey,
+    resolved.outputInterval,
+    total,
+    { nowMs }
+  );
+  if (freshCache?.rows?.length) {
+    return freshCache.rows;
+  }
+
+  const retryState = readExternalHistoryRetryState(cacheKey);
+  if (retryState && retryState.retryAt > nowMs) {
+    const staleCache = getCachedExternalHistoryRows(
+      cacheKey,
+      resolved.outputInterval,
+      total,
+      { nowMs, allowStale: true }
+    );
+    if (staleCache?.rows?.length) {
+      return staleCache.rows;
+    }
+
+    throw new Error(
+      `twelvedata_retry_cooldown:${new Date(retryState.retryAt).toISOString()}`
+    );
+  }
+  if (retryState && retryState.retryAt <= nowMs) {
+    clearExternalHistoryRetryState(cacheKey);
+  }
+
   const rows = [];
   let endDate = null;
   let safety = 0;
   const pageSize = Math.max(1, Math.min(5000, total));
 
-  while (rows.length < total && safety < 20) {
-    safety += 1;
-    const batch = await fetchTwelveDataBatch({
-      ticker,
-      interval: resolved.requestInterval,
-      total: pageSize,
-      apiKey,
-      exchange,
-      httpGet: options.httpGet,
-      endDate,
-      env,
-      sleep: options.sleep,
-      now: options.now,
-    });
+  try {
+    while (rows.length < total && safety < 20) {
+      safety += 1;
+      const batch = await fetchTwelveDataBatch({
+        ticker,
+        interval: resolved.requestInterval,
+        total: pageSize,
+        apiKey,
+        exchange,
+        httpGet: options.httpGet,
+        endDate,
+        env,
+        sleep: options.sleep,
+        now: options.now,
+      });
 
-    const normalized = batch
-      .map((row) => normalizeTwelveDataRow(row, resolved.outputInterval))
-      .filter(Boolean)
-      .sort((a, b) => a.openTime - b.openTime);
+      const normalized = batch
+        .map((row) => normalizeTwelveDataRow(row, resolved.outputInterval))
+        .filter(Boolean)
+        .sort((a, b) => a.openTime - b.openTime);
 
-    if (!normalized.length) break;
+      if (!normalized.length) break;
 
-    if (!rows.length) {
-      rows.push(...normalized);
-    } else {
-      const oldestKnown = rows[0].openTime;
-      const deduped = normalized.filter((row) => row.openTime < oldestKnown);
-      if (!deduped.length) break;
-      rows.unshift(...deduped);
+      if (!rows.length) {
+        rows.push(...normalized);
+      } else {
+        const oldestKnown = rows[0].openTime;
+        const deduped = normalized.filter((row) => row.openTime < oldestKnown);
+        if (!deduped.length) break;
+        rows.unshift(...deduped);
+      }
+
+      const oldest = rows[0];
+      const intervalMs = intervalToMs(resolved.outputInterval) || 0;
+      endDate = formatTwelveDateTime(oldest.openTime - intervalMs, resolved.requestInterval);
+      if (!endDate || normalized.length < Math.max(25, Math.floor(pageSize / 4))) break;
+    }
+  } catch (error) {
+    const retryAt = resolveTwelveDataRetryAtMs(error?.payload, env, nowMs);
+    if (retryAt > 0) {
+      writeExternalHistoryRetryState(cacheKey, {
+        retryAt,
+        reason: error.message,
+      });
     }
 
-    const oldest = rows[0];
-    const intervalMs = intervalToMs(resolved.outputInterval) || 0;
-    endDate = formatTwelveDateTime(oldest.openTime - intervalMs, resolved.requestInterval);
-    if (!endDate || normalized.length < Math.max(25, Math.floor(pageSize / 4))) break;
+    const staleCache = getCachedExternalHistoryRows(
+      cacheKey,
+      resolved.outputInterval,
+      total,
+      { nowMs, allowStale: true }
+    );
+    if (staleCache?.rows?.length) {
+      return staleCache.rows;
+    }
+
+    throw error;
   }
 
   const finalRows = resolved.aggregate
     ? aggregateCandlesToInterval(rows, resolved.outputInterval)
     : rows;
 
-  return finalRows.slice(-total);
+  const outputRows = finalRows.slice(-total);
+  if (outputRows.length) {
+    writeExternalHistoryCache(cacheKey, finalRows);
+    clearExternalHistoryRetryState(cacheKey);
+  }
+  return outputRows;
 }
 
 function resolveExternalHistoryProvider(symbol, interval, env = process.env) {
@@ -456,10 +727,24 @@ module.exports = {
   pickTwelveDataExchange,
   resolveTwelveDataInterval,
   aggregateCandlesToInterval,
+  buildExternalHistoryCacheKey,
+  getExternalHistoryCacheFile,
+  getExternalHistoryRetryFile,
+  readExternalHistoryCache,
+  writeExternalHistoryCache,
+  readExternalHistoryRetryState,
+  writeExternalHistoryRetryState,
+  clearExternalHistoryRetryState,
+  getCacheFreshUntilMs,
+  getCachedExternalHistoryRows,
   normalizeTwelveDataRow,
   getTwelveDataMinIntervalMs,
   getTwelveDataRateLimitBackoffMs,
+  getTwelveDataDailyLimitBackoffMs,
   isTwelveDataRateLimitPayload,
+  isTwelveDataDailyCreditPayload,
+  getNextUtcMidnightMs,
+  resolveTwelveDataRetryAtMs,
   runTwelveDataRateLimited,
   resetTwelveDataRateLimiter,
   resolveExternalHistoryProvider,

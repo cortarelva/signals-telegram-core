@@ -1,0 +1,157 @@
+{
+  "DEFAULTS": {
+    "BREAKDOWN_RETEST_SHORT": {
+      "enabled": false
+    },
+    "BULL_TRAP": {
+      "enabled": false
+    },
+    "FAILED_BREAKDOWN": {
+      "enabled": false
+    },
+    "OVERSOLD_BOUNCE": {
+      "enabled": false
+    },
+    "TREND": {
+      "enabled": false
+    },
+    "TREND_SHORT": {
+      "enabled": false
+    },
+    "MOMENTUM_BREAKOUT_LONG": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_LONG": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_SHORT": {
+      "enabled": false
+    },
+    "IGNITION_CONTINUATION_LONG": {
+      "enabled": false
+    },
+    "LIQUIDITY_SWEEP_RECLAIM_LONG": {
+      "enabled": false
+    },
+    "FLUSH_RECLAIM_LONG": {
+      "enabled": false
+    },
+    "BREAKDOWN_CONTINUATION_BASE_SHORT": {
+      "enabled": false
+    }
+  },
+  "ADAUSDC": {
+    "ENABLED": true,
+    "TF": "15m",
+    "HTF_TF": "1d",
+    "BREAKDOWN_CONTINUATION_BASE_SHORT": {
+      "enabled": true,
+      "minScore": 60,
+      "EXECUTION": {
+        "bucket": "exploratory",
+        "riskPerTrade": 0.0025,
+        "maxPositionUsd": 25,
+        "maxPortfolioNotionalUsd": 50,
+        "maxSideNotionalUsd": 50,
+        "maxPortfolioRiskUsd": 0.5,
+        "maxSideRiskUsd": 0.5,
+        "maxRollingNetLossUsd": 0.75,
+        "rollingLossLookbackHours": 24,
+        "maxConsecutiveLosses": 2,
+        "lossStreakCooldownMins": 180
+      },
+      "BTC_CONTEXT_GATE": {
+        "enabled": true,
+        "btcSymbol": "BTCUSDC",
+        "timeframe": "15m",
+        "limit": 256,
+        "states": [
+          "risk_off_selloff"
+        ],
+        "minNegativeBreadth": 0.6,
+        "minFollowRate": 0.6,
+        "symbols": [
+          "ADAUSDC",
+          "LINKUSDC",
+          "1000PEPEUSDC"
+        ]
+      }
+    }
+  },
+  "LINKUSDC": {
+    "ENABLED": true,
+    "TF": "15m",
+    "HTF_TF": "1d",
+    "BREAKDOWN_CONTINUATION_BASE_SHORT": {
+      "enabled": true,
+      "minScore": 60,
+      "EXECUTION": {
+        "bucket": "exploratory",
+        "riskPerTrade": 0.0025,
+        "maxPositionUsd": 25,
+        "maxPortfolioNotionalUsd": 50,
+        "maxSideNotionalUsd": 50,
+        "maxPortfolioRiskUsd": 0.5,
+        "maxSideRiskUsd": 0.5,
+        "maxRollingNetLossUsd": 0.75,
+        "rollingLossLookbackHours": 24,
+        "maxConsecutiveLosses": 2,
+        "lossStreakCooldownMins": 180
+      },
+      "BTC_CONTEXT_GATE": {
+        "enabled": true,
+        "btcSymbol": "BTCUSDC",
+        "timeframe": "15m",
+        "limit": 256,
+        "states": [
+          "risk_off_selloff"
+        ],
+        "minNegativeBreadth": 0.6,
+        "minFollowRate": 0.6,
+        "symbols": [
+          "ADAUSDC",
+          "LINKUSDC",
+          "1000PEPEUSDC"
+        ]
+      }
+    }
+  },
+  "1000PEPEUSDC": {
+    "ENABLED": true,
+    "TF": "15m",
+    "HTF_TF": "1d",
+    "BREAKDOWN_CONTINUATION_BASE_SHORT": {
+      "enabled": true,
+      "minScore": 60,
+      "EXECUTION": {
+        "bucket": "exploratory",
+        "riskPerTrade": 0.0025,
+        "maxPositionUsd": 25,
+        "maxPortfolioNotionalUsd": 50,
+        "maxSideNotionalUsd": 50,
+        "maxPortfolioRiskUsd": 0.5,
+        "maxSideRiskUsd": 0.5,
+        "maxRollingNetLossUsd": 0.75,
+        "rollingLossLookbackHours": 24,
+        "maxConsecutiveLosses": 2,
+        "lossStreakCooldownMins": 180
+      },
+      "BTC_CONTEXT_GATE": {
+        "enabled": true,
+        "btcSymbol": "BTCUSDC",
+        "timeframe": "15m",
+        "limit": 256,
+        "states": [
+          "risk_off_selloff"
+        ],
+        "minNegativeBreadth": 0.6,
+        "minFollowRate": 0.6,
+        "symbols": [
+          "ADAUSDC",
+          "LINKUSDC",
+          "1000PEPEUSDC"
+        ]
+      }
+    }
+  }
+}

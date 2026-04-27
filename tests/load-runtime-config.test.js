@@ -107,3 +107,46 @@ test("loadRuntimeConfigFiles merges DEFAULTS and adaptive trendShort overrides",
   assert.equal(config.XRPUSDC.ENABLED, false);
   assert.equal(config.XRPUSDC.BULL_TRAP.enabled, false);
 });
+
+test("loadRuntimeConfigFiles uses env override paths when explicit files are omitted", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "runtime-config-env-"));
+  const strategyFile = path.join(dir, "strategy-env.json");
+  const adaptiveFile = path.join(dir, "adaptive-env.json");
+
+  fs.writeFileSync(
+    strategyFile,
+    JSON.stringify(
+      {
+        TESTUSDC: {
+          ENABLED: true,
+          TF: "15m",
+          CIPHER_CONTINUATION_LONG: { enabled: true },
+        },
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+
+  fs.writeFileSync(adaptiveFile, JSON.stringify({ symbols: {} }, null, 2), "utf8");
+
+  const previousStrategyFile = process.env.STRATEGY_CONFIG_FILE_PATH;
+  const previousAdaptiveFile = process.env.ADAPTIVE_CONFIG_FILE_PATH;
+
+  process.env.STRATEGY_CONFIG_FILE_PATH = strategyFile;
+  process.env.ADAPTIVE_CONFIG_FILE_PATH = adaptiveFile;
+
+  try {
+    const config = loadRuntimeConfigFiles();
+    assert.equal(config.TESTUSDC.ENABLED, true);
+    assert.equal(config.TESTUSDC.TF, "15m");
+    assert.equal(config.TESTUSDC.CIPHER_CONTINUATION_LONG.enabled, true);
+  } finally {
+    if (previousStrategyFile == null) delete process.env.STRATEGY_CONFIG_FILE_PATH;
+    else process.env.STRATEGY_CONFIG_FILE_PATH = previousStrategyFile;
+
+    if (previousAdaptiveFile == null) delete process.env.ADAPTIVE_CONFIG_FILE_PATH;
+    else process.env.ADAPTIVE_CONFIG_FILE_PATH = previousAdaptiveFile;
+  }
+});

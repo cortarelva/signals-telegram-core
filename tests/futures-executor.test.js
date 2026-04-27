@@ -18,7 +18,10 @@ Module._load = function mockedLoad(request, parent, isMain) {
   return originalLoad.call(this, request, parent, isMain);
 };
 
-const { paperExecute } = require("../runtime/futures-executor");
+const {
+  paperExecute,
+  resolveAccountSizeReference,
+} = require("../runtime/futures-executor");
 
 Module._load = originalLoad;
 
@@ -78,4 +81,29 @@ test("paperExecute applies per-strategy risk override to sizing", async () => {
   assert.equal(result.order.riskPerTrade, 0.0025);
   assert.equal(result.order.positionNotional, 25);
   assert.equal(result.order.riskUsd, 0.25);
+});
+
+test("resolveAccountSizeReference prefers available balance in auto mode", () => {
+  const auto = resolveAccountSizeReference({
+    configuredAccountSize: 1000,
+    availableBalance: 87.25,
+    mode: "auto",
+  });
+  const fallback = resolveAccountSizeReference({
+    configuredAccountSize: 1000,
+    availableBalance: null,
+    mode: "auto",
+  });
+  const forcedStatic = resolveAccountSizeReference({
+    configuredAccountSize: 1000,
+    availableBalance: 87.25,
+    mode: "static",
+  });
+
+  assert.equal(auto.accountSize, 87.25);
+  assert.equal(auto.source, "available_balance");
+  assert.equal(fallback.accountSize, 1000);
+  assert.equal(fallback.source, "static_fallback");
+  assert.equal(forcedStatic.accountSize, 1000);
+  assert.equal(forcedStatic.source, "static");
 });

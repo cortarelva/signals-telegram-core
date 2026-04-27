@@ -36,6 +36,11 @@ const FUTURES_MIN_NOTIONAL_USDT = Number(process.env.FUTURES_MIN_NOTIONAL_USDT |
 const FUTURES_BALANCE_BUFFER_PCT = Number(process.env.FUTURES_BALANCE_BUFFER_PCT || 0.90);
 const FUTURES_MAX_POSITION_USDT = Number(process.env.FUTURES_MAX_POSITION_USDT || 40);
 const ACCOUNT_SIZE = Number(process.env.ACCOUNT_SIZE || 1000);
+const FUTURES_ACCOUNT_SIZE_MODE = String(
+  process.env.FUTURES_ACCOUNT_SIZE_MODE || "auto"
+)
+  .trim()
+  .toLowerCase();
 const BINANCE_RECV_WINDOW = Number(process.env.BINANCE_RECV_WINDOW || 5000);
 
 const ORDERS_LOG_FILE =
@@ -281,6 +286,41 @@ function calcPositionSizeByRisk({
   };
 }
 
+function resolveAccountSizeReference({
+  configuredAccountSize,
+  availableBalance,
+  mode = FUTURES_ACCOUNT_SIZE_MODE,
+}) {
+  const configured = Number(configuredAccountSize);
+  const available = Number(availableBalance);
+  const normalizedMode = String(mode || "auto").trim().toLowerCase();
+
+  if (normalizedMode === "static") {
+    return {
+      accountSize:
+        Number.isFinite(configured) && configured > 0 ? configured : ACCOUNT_SIZE,
+      source: "static",
+    };
+  }
+
+  if (
+    (normalizedMode === "available_balance" || normalizedMode === "auto") &&
+    Number.isFinite(available) &&
+    available > 0
+  ) {
+    return {
+      accountSize: available,
+      source: "available_balance",
+    };
+  }
+
+  return {
+    accountSize:
+      Number.isFinite(configured) && configured > 0 ? configured : ACCOUNT_SIZE,
+    source: "static_fallback",
+  };
+}
+
 
 function quoteAssetFromSymbol(symbol) {
   if (String(symbol).endsWith("USDC")) return "USDC";
@@ -438,6 +478,14 @@ function summarizeOrderFills(symbol, fills = []) {
 
 function buildExecutionAuditFields(execution) {
   return {
+    riskPerTrade: hasFiniteNumberValue(execution?.riskPerTrade)
+      ? Number(execution.riskPerTrade)
+      : null,
+    executionBucket: execution?.executionBucket ?? null,
+    accountSizeReference: hasFiniteNumberValue(execution?.accountSizeReference)
+      ? Number(execution.accountSizeReference)
+      : null,
+    accountSizeSource: execution?.accountSizeSource ?? null,
     entryPlanned: hasFiniteNumberValue(execution?.entryPlanned)
       ? Number(execution.entryPlanned)
       : null,
@@ -1069,6 +1117,10 @@ function buildBaseExecution(signalObj, sizing, options = {}) {
     score: signalObj.score,
     riskPerTrade: Number.isFinite(riskPerTrade) ? round(riskPerTrade, 6) : null,
     executionBucket: signalObj.executionBucket || null,
+    accountSizeReference: Number.isFinite(Number(options.accountSizeReference))
+      ? round(Number(options.accountSizeReference), 6)
+      : null,
+    accountSizeSource: options.accountSizeSource || null,
 
     side: getOpenOrderSide(signalObj.direction),
     entry: Number(signalObj.entry),
@@ -1891,7 +1943,7 @@ async function closeRealFuturesPosition(execution, closeReason, exitPriceRef = n
 
 async function paperExecute(signalObj, state, options = {}) {
   const executionSignal = normalizeSignalForExecution(signalObj);
-  const accountSize = Number(options.accountSize || ACCOUNT_SIZE);
+  const configuredAccountSize = Number(options.accountSize || ACCOUNT_SIZE);
   const riskPerTrade = Number(
     options.riskPerTrade || executionSignal.executionRiskPerTrade || FUTURES_RISK_PER_TRADE
   );
@@ -1916,6 +1968,18 @@ async function paperExecute(signalObj, state, options = {}) {
     };
   }
 
+  const leverage = Number(options.leverage || FUTURES_DEFAULT_LEVERAGE);
+  const quoteAsset = quoteAssetFromSymbol(executionSignal.symbol);
+  const availableBalance =
+    EXECUTION_MODE === "binance_real"
+      ? await fetchAvailableFuturesBalance(quoteAsset)
+      : null;
+  const accountSizeDecision = resolveAccountSizeReference({
+    configuredAccountSize,
+    availableBalance,
+  });
+  const accountSize = Number(accountSizeDecision.accountSize);
+
   const approval = canExecute(executionSignal, state, {
     ...options,
     accountSize,
@@ -1929,13 +1993,6 @@ async function paperExecute(signalObj, state, options = {}) {
       order: null,
     };
   }
-
-  const leverage = Number(options.leverage || FUTURES_DEFAULT_LEVERAGE);
-  const quoteAsset = quoteAssetFromSymbol(executionSignal.symbol);
-  const availableBalance =
-    EXECUTION_MODE === "binance_real"
-      ? await fetchAvailableFuturesBalance(quoteAsset)
-      : null;
 
   let sizing = calcPositionSizeByRisk({
     accountSize,
@@ -1997,7 +2054,7 @@ async function paperExecute(signalObj, state, options = {}) {
       )} accountRef=${round(
         accountSize,
         4
-      )} riskUsd=${round(
+      )} accountSource=${accountSizeDecision.source} riskUsd=${round(
         sizing.riskUsd,
         4
       )} marginRequired=${round(
@@ -2013,6 +2070,8 @@ async function paperExecute(signalObj, state, options = {}) {
   let execution = buildBaseExecution(executionSignal, sizing, {
     leverage,
     riskPerTrade,
+    accountSizeReference: accountSize,
+    accountSizeSource: accountSizeDecision.source,
   });
   execution.entryFill = execution.entry;
   execution.entryPlanned = execution.entry;
@@ -2197,4 +2256,5 @@ module.exports = {
   calcPnlUsd,
   calcPositionSizeByRisk,
   capSizingToBalance,
+  resolveAccountSizeReference,
 };

@@ -3,6 +3,14 @@ function getOpenExecutions(state) {
   return state.executions.filter((e) => e.status === "OPEN");
 }
 
+function getClosedExecutions(state) {
+  if (!Array.isArray(state?.executions)) return [];
+  return state.executions
+    .filter((e) => e.status === "CLOSED")
+    .filter((e) => Number.isFinite(Number(e?.closedTs)))
+    .sort((a, b) => Number(a.closedTs) - Number(b.closedTs));
+}
+
 function countOpenBySymbol(openExecutions, symbol) {
   return (openExecutions || []).filter((e) => e.symbol === symbol).length;
 }
@@ -13,6 +21,11 @@ function countOpenTotal(openExecutions) {
 
 function toPositiveNumber(value, fallback = 0) {
   const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+function toPositiveInteger(value, fallback = 0) {
+  const n = Math.floor(Number(value));
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
@@ -78,6 +91,21 @@ function getExecutionRiskUsd(execution) {
 
   if (notional > 0 && Number.isFinite(stopDistancePct) && stopDistancePct > 0) {
     return notional * stopDistancePct;
+  }
+
+  return 0;
+}
+
+function getExecutionRealizedPnlUsd(execution) {
+  const candidates = [
+    execution?.pnlRealizedNet,
+    execution?.pnlUsd,
+    execution?.realizedPnlUsd,
+  ];
+
+  for (const candidate of candidates) {
+    const value = Number(candidate);
+    if (Number.isFinite(value)) return value;
   }
 
   return 0;
@@ -185,6 +213,81 @@ function buildPortfolioLimits(options = {}) {
   };
 }
 
+function buildRecentRiskSnapshot(state, options = {}) {
+  const currentTs = Number.isFinite(Number(options.currentTs))
+    ? Number(options.currentTs)
+    : Date.now();
+  const rollingLossLookbackHours = toPositiveNumber(
+    options.rollingLossLookbackHours ??
+      process.env.FUTURES_ROLLING_LOSS_LOOKBACK_HOURS,
+    24
+  );
+  const maxRollingNetLossUsd = toPositiveNumber(
+    options.maxRollingNetLossUsd ??
+      process.env.FUTURES_MAX_ROLLING_NET_LOSS_USD,
+    0
+  );
+  const maxConsecutiveLosses = toPositiveInteger(
+    options.maxConsecutiveLosses ??
+      process.env.FUTURES_MAX_CONSECUTIVE_LOSSES,
+    0
+  );
+  const lossStreakCooldownMins = toPositiveInteger(
+    options.lossStreakCooldownMins ??
+      process.env.FUTURES_LOSS_STREAK_COOLDOWN_MINS,
+    0
+  );
+
+  const closedExecutions = getClosedExecutions(state);
+  const lookbackMs = rollingLossLookbackHours * 60 * 60 * 1000;
+  const rollingWindowExecutions = closedExecutions.filter(
+    (execution) => currentTs - Number(execution.closedTs) <= lookbackMs
+  );
+  const rollingNetPnlUsd = rollingWindowExecutions.reduce(
+    (sum, execution) => sum + getExecutionRealizedPnlUsd(execution),
+    0
+  );
+
+  let consecutiveLosses = 0;
+  let lastLossTs = null;
+
+  for (let idx = closedExecutions.length - 1; idx >= 0; idx -= 1) {
+    const pnlUsd = getExecutionRealizedPnlUsd(closedExecutions[idx]);
+    if (pnlUsd < 0) {
+      consecutiveLosses += 1;
+      if (!lastLossTs) {
+        lastLossTs = Number(closedExecutions[idx].closedTs);
+      }
+      continue;
+    }
+    break;
+  }
+
+  const lossStreakCooldownActive =
+    maxConsecutiveLosses > 0 &&
+    lossStreakCooldownMins > 0 &&
+    consecutiveLosses >= maxConsecutiveLosses &&
+    Number.isFinite(Number(lastLossTs)) &&
+    currentTs - Number(lastLossTs) < lossStreakCooldownMins * 60 * 1000;
+
+  const rollingLossLimitReached =
+    maxRollingNetLossUsd > 0 && rollingNetPnlUsd <= -maxRollingNetLossUsd;
+
+  return {
+    currentTs,
+    rollingLossLookbackHours,
+    maxRollingNetLossUsd,
+    rollingNetPnlUsd,
+    rollingWindowClosedCount: rollingWindowExecutions.length,
+    maxConsecutiveLosses,
+    consecutiveLosses,
+    lossStreakCooldownMins,
+    lastLossTs,
+    lossStreakCooldownActive,
+    rollingLossLimitReached,
+  };
+}
+
 function canExecute(signalObj, state, options = {}) {
   const {
     minScore = 70,
@@ -241,6 +344,7 @@ function canExecute(signalObj, state, options = {}) {
     ...options,
     maxOpenTradesTotal,
   });
+  const recentRiskSnapshot = buildRecentRiskSnapshot(state, options);
   const projectedNotional = deriveProjectedSignalNotionalUsd(signalObj, options);
   const projectedRisk = deriveProjectedSignalRiskUsd(signalObj, options);
 
@@ -293,10 +397,19 @@ function canExecute(signalObj, state, options = {}) {
     return { ok: false, reason: "side_risk_limit_reached" };
   }
 
+  if (recentRiskSnapshot.rollingLossLimitReached) {
+    return { ok: false, reason: "rolling_loss_limit_reached" };
+  }
+
+  if (recentRiskSnapshot.lossStreakCooldownActive) {
+    return { ok: false, reason: "loss_streak_cooldown_active" };
+  }
+
   return { ok: true, reason: "approved" };
 }
 
 module.exports = {
+  buildRecentRiskSnapshot,
   canExecute,
   deriveProjectedSignalNotionalUsd,
   deriveProjectedSignalRiskUsd,

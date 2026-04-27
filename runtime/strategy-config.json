@@ -212,7 +212,15 @@
           "EXECUTION": {
             "bucket": "exploratory",
             "riskPerTrade": 0.0025,
-            "maxPositionUsd": 25
+            "maxPositionUsd": 25,
+            "maxPortfolioNotionalUsd": 50,
+            "maxSideNotionalUsd": 50,
+            "maxPortfolioRiskUsd": 0.5,
+            "maxSideRiskUsd": 0.5,
+            "maxRollingNetLossUsd": 0.75,
+            "rollingLossLookbackHours": 24,
+            "maxConsecutiveLosses": 2,
+            "lossStreakCooldownMins": 180
           }
         }
       }
@@ -320,7 +328,15 @@
           "EXECUTION": {
             "bucket": "exploratory",
             "riskPerTrade": 0.0025,
-            "maxPositionUsd": 25
+            "maxPositionUsd": 25,
+            "maxPortfolioNotionalUsd": 50,
+            "maxSideNotionalUsd": 50,
+            "maxPortfolioRiskUsd": 0.5,
+            "maxSideRiskUsd": 0.5,
+            "maxRollingNetLossUsd": 0.75,
+            "rollingLossLookbackHours": 24,
+            "maxConsecutiveLosses": 2,
+            "lossStreakCooldownMins": 180
           }
         }
       }

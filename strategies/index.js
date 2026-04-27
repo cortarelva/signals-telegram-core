@@ -5,6 +5,7 @@ const {
 } = require("./breakdown-retest-short-strategy");
 const { evaluateBullTrapStrategy } = require("./bull-trap-strategy");
 const { evaluateFailedBreakdownStrategy } = require("./failed-breakdown-strategy");
+const { evaluateOversoldBounceStrategy } = require("./oversold-bounce-strategy");
 const {
   evaluateMomentumBreakoutLongStrategy,
 } = require("./momentum-breakout-long-strategy");
@@ -17,6 +18,9 @@ const {
 const {
   evaluateIgnitionContinuationLongStrategy,
 } = require("./ignition-continuation-long-strategy");
+const {
+  evaluateFlushReclaimLongStrategy,
+} = require("./flush-reclaim-long-strategy");
 
 function envBool(name, fallback) {
   const raw = process.env[name];
@@ -50,6 +54,8 @@ function isStrategyEnabled(ctx, strategyKey) {
       return getStrategyConfig(ctx, ["BULL_TRAP"]).enabled !== false;
     case "FAILED_BREAKDOWN":
       return getStrategyConfig(ctx, ["FAILED_BREAKDOWN"]).enabled !== false;
+    case "OVERSOLD_BOUNCE":
+      return getStrategyConfig(ctx, ["OVERSOLD_BOUNCE"]).enabled === true;
     case "MOMENTUM_BREAKOUT_LONG":
       return envBool(
         "MOMENTUM_BREAKOUT_LONG_ENABLED",
@@ -73,6 +79,11 @@ function isStrategyEnabled(ctx, strategyKey) {
       return getStrategyConfig(ctx, [
         "IGNITION_CONTINUATION_LONG",
         "EXPANSION_CONTINUATION_LONG",
+      ]).enabled === true;
+    case "FLUSH_RECLAIM_LONG":
+      return getStrategyConfig(ctx, [
+        "FLUSH_RECLAIM_LONG",
+        "EARLY_EXPANSION_RECLAIM_LONG",
       ]).enabled === true;
     default:
       return true;
@@ -101,6 +112,10 @@ const STRATEGY_DESCRIPTORS = [
     evaluate: evaluateFailedBreakdownStrategy,
   },
   {
+    key: "OVERSOLD_BOUNCE",
+    evaluate: evaluateOversoldBounceStrategy,
+  },
+  {
     key: "MOMENTUM_BREAKOUT_LONG",
     evaluate: evaluateMomentumBreakoutLongStrategy,
   },
@@ -115,6 +130,10 @@ const STRATEGY_DESCRIPTORS = [
   {
     key: "IGNITION_CONTINUATION_LONG",
     evaluate: evaluateIgnitionContinuationLongStrategy,
+  },
+  {
+    key: "FLUSH_RECLAIM_LONG",
+    evaluate: evaluateFlushReclaimLongStrategy,
   },
 ];
 

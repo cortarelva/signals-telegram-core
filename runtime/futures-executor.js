@@ -497,6 +497,7 @@ function logReconcileMismatch({ symbol, internalPnl, binancePnl }) {
 }
 
 async function sendProtectionAlert(message) {
+  if (EXECUTION_MODE !== "binance_real") return;
   if (!ENABLE_TELEGRAM || !TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
 
   try {

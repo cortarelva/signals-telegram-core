@@ -1,6 +1,7 @@
 let dashboardData = null;
 let charts = {};
 let tvWidgetSymbol = "BINANCE:BTCUSDC";
+let loadPromise = null;
 const HISTORY_TABLE_LIMIT = 25;
 
 if (window.Chart) {
@@ -1510,26 +1511,44 @@ function applyFiltersAndRender() {
 }
 
 async function load() {
-  const res = await fetch("/api/state");
-  dashboardData = await res.json();
+  if (loadPromise) return loadPromise;
 
-  document.getElementById("meta").textContent =
-    `Updated: ${new Date(dashboardData.generatedAt).toLocaleString()} | Mode: ${dashboardData.executionMode || "-"}`;
+  loadPromise = (async () => {
+    try {
+      const res = await fetch("/api/state");
+      if (!res.ok) {
+        throw new Error(`dashboard_state_http_${res.status}`);
+      }
 
-  populateSelect("symbolFilter", dashboardData.allSymbols || []);
-  populateSelect("tfFilter", dashboardData.allTimeframes || []);
-  populateTvSymbols(dashboardData.allSymbols || ["BTCUSDC"]);
+      dashboardData = await res.json();
 
-  if (!document.getElementById("tvSymbol").dataset.bound) {
-    document.getElementById("tvSymbol").addEventListener("change", (e) => {
-      tvWidgetSymbol = e.target.value;
-      renderTradingView(tvWidgetSymbol);
-    });
-    document.getElementById("tvSymbol").dataset.bound = "1";
-  }
+      document.getElementById("meta").textContent =
+        `Updated: ${new Date(dashboardData.generatedAt).toLocaleString()} | Mode: ${dashboardData.executionMode || "-"}`;
 
-  applyFiltersAndRender();
-  renderTradingView(document.getElementById("tvSymbol").value || tvWidgetSymbol);
+      populateSelect("symbolFilter", dashboardData.allSymbols || []);
+      populateSelect("tfFilter", dashboardData.allTimeframes || []);
+      populateTvSymbols(dashboardData.allSymbols || ["BTCUSDC"]);
+
+      if (!document.getElementById("tvSymbol").dataset.bound) {
+        document.getElementById("tvSymbol").addEventListener("change", (e) => {
+          tvWidgetSymbol = e.target.value;
+          renderTradingView(tvWidgetSymbol);
+        });
+        document.getElementById("tvSymbol").dataset.bound = "1";
+      }
+
+      applyFiltersAndRender();
+      renderTradingView(document.getElementById("tvSymbol").value || tvWidgetSymbol);
+    } catch (err) {
+      console.error("dashboard_load_failed", err);
+      document.getElementById("meta").textContent =
+        "Erro a carregar dashboard. Tenta Refresh dentro de alguns segundos.";
+    } finally {
+      loadPromise = null;
+    }
+  })();
+
+  return loadPromise;
 }
 
 function bindEvents() {
@@ -1551,4 +1570,6 @@ function bindEvents() {
 bindEvents();
 initTabs();
 load();
-setInterval(load, 5000);
+setInterval(() => {
+  void load();
+}, 10000);

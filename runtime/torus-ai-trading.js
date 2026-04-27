@@ -27,6 +27,10 @@ const { evaluateMetaModelCandidate } = require("./meta-model-filter");
 const {
   rankExecutionCandidates,
 } = require("./continuation-ranker");
+const {
+  resolveExternalHistoryProvider,
+  fetchKlinesFromExternalProvider,
+} = require("../research/external-history");
 
 // =========================
 // Config
@@ -382,6 +386,11 @@ function markProcessedClosedCandle(state, symbol, tf, candleCloseTime) {
 }
 
 async function sendTelegramMessage(text) {
+  if (EXECUTION_MODE === "paper") {
+    console.log("[TG] paper mode — não envia Telegram.");
+    return;
+  }
+
   if (!ENABLE_TELEGRAM) {
     console.log("[TG] envio desativado.");
     return;
@@ -541,6 +550,46 @@ function buildClosedTradeTelegramMessage({
 }
 
 async function fetchKlines(symbol, interval, limit) {
+  const externalProvider = resolveExternalHistoryProvider(
+    symbol,
+    interval,
+    process.env
+  );
+
+  if (externalProvider) {
+    try {
+      const rows = await fetchKlinesFromExternalProvider(
+        externalProvider,
+        symbol,
+        interval,
+        limit,
+        { env: process.env }
+      );
+
+      if (Array.isArray(rows) && rows.length > 0) {
+        return rows.map((k) => ({
+          openTime: Number(k.openTime),
+          open: Number(k.open),
+          high: Number(k.high),
+          low: Number(k.low),
+          close: Number(k.close),
+          volume: Number(k.volume || 0),
+          closeTime: Number(k.closeTime),
+        }));
+      }
+
+      console.warn(
+        `[HISTORY] ${symbol} ${interval} external provider returned no candles; fallback=binance`
+      );
+    } catch (err) {
+      console.warn(
+        `[HISTORY] ${symbol} ${interval} external provider failed; fallback=binance reason=${
+          err?.message || err
+        }`
+      );
+    }
+  }
+
   const url = `${BINANCE_FUTURES_BASE}/fapi/v1/klines`;
   const { data } = await axios.get(url, {
     params: { symbol, interval, limit },

@@ -1,6 +1,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const zlib = require("zlib");
 const { execFile } = require("child_process");
 const {
   readJsonSafe: readJsonFileSafe,
@@ -52,6 +53,9 @@ const RESEARCH_JSON_FILE = path.join(__dirname, "..", "research", "consolidated-
 const RESEARCH_CSV_FILE = path.join(__dirname, "..", "research", "consolidated-trades.csv");
 
 const PUBLIC_DIR = path.join(__dirname, "..", "dashboard");
+const DASHBOARD_RAW_SIGNAL_LIMIT = 1000;
+const DASHBOARD_RAW_CLOSED_LIMIT = 500;
+const DASHBOARD_RAW_EXECUTION_LIMIT = 500;
 
 function readJsonSafe(filePath, fallback) {
   return readJsonFileSafe(filePath, fallback);
@@ -483,6 +487,52 @@ function annotateTradeOutcome(record) {
   };
 }
 
+function compactDashboardRecord(record) {
+  if (!record || typeof record !== "object") return record;
+
+  const compact = {};
+
+  for (const [key, value] of Object.entries(record)) {
+    if (
+      value == null ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    ) {
+      compact[key] = value;
+      continue;
+    }
+
+    if (typeof value === "string") {
+      compact[key] = value.length > 400 ? `${value.slice(0, 397)}...` : value;
+      continue;
+    }
+
+    if (Array.isArray(value)) {
+      const primitiveArray = value.every(
+        (entry) =>
+          entry == null ||
+          typeof entry === "string" ||
+          typeof entry === "number" ||
+          typeof entry === "boolean"
+      );
+
+      if (primitiveArray) {
+        compact[key] = value.slice(0, 50).map((entry) =>
+          typeof entry === "string" && entry.length > 200
+            ? `${entry.slice(0, 197)}...`
+            : entry
+        );
+      }
+    }
+  }
+
+  return compact;
+}
+
+function compactDashboardRecords(records) {
+  return (Array.isArray(records) ? records : []).map(compactDashboardRecord);
+}
+
 function buildStats(state, mergedConfig, generatedConfig, metrics, exchange) {
   const openSignalsRaw = Array.isArray(state.openSignals) ? state.openSignals : [];
   const closedSignals = Array.isArray(state.closedSignals) ? state.closedSignals : [];
@@ -584,9 +634,16 @@ function buildStats(state, mergedConfig, generatedConfig, metrics, exchange) {
     else byScoreBucket[bucket].ignore++;
   }
 
-  const recentClosed = [...closedSignals].slice(-100).reverse().map(annotateTradeOutcome);
-  const recentSignals = [...signalLog].slice(-200).reverse();
-  const recentExecutions = [...executions].slice(-100).reverse().map(annotateTradeOutcome);
+  const dashboardClosedSignals = compactDashboardRecords(
+    closedSignals.slice(-DASHBOARD_RAW_CLOSED_LIMIT)
+  );
+  const dashboardSignalLog = compactDashboardRecords(
+    signalLog.slice(-DASHBOARD_RAW_SIGNAL_LIMIT)
+  );
+  const dashboardExecutions = compactDashboardRecords(
+    executions.slice(-DASHBOARD_RAW_EXECUTION_LIMIT)
+  );
+  const dashboardOpenSignals = compactDashboardRecords(openSignals);
 
   const allSymbols = Array.from(
     new Set(
@@ -635,21 +692,12 @@ function buildStats(state, mergedConfig, generatedConfig, metrics, exchange) {
     allSymbols,
     allTimeframes,
 
-    recentClosed,
-    recentSignals,
-    recentExecutions,
-
-    config: {
-      merged: mergedConfig,
-      generated: generatedConfig,
-    },
-
     raw: {
-      openSignals,
-      closedSignals,
-      signalLog,
-      executions,
-      metrics: Array.isArray(metrics) ? metrics : [],
+      openSignals: dashboardOpenSignals,
+      closedSignals: dashboardClosedSignals,
+      signalLog: dashboardSignalLog,
+      executions: dashboardExecutions,
+      metrics: compactDashboardRecords(Array.isArray(metrics) ? metrics : []),
     },
   };
 }
@@ -662,12 +710,28 @@ function getContentType(filePath) {
   return "text/plain; charset=utf-8";
 }
 
-function sendJson(res, statusCode, payload) {
+function sendJson(req, res, statusCode, payload) {
+  const body = Buffer.from(JSON.stringify(payload, null, 2));
+  const acceptEncoding = String(req.headers["accept-encoding"] || "");
+
+  if (acceptEncoding.includes("gzip")) {
+    const compressed = zlib.gzipSync(body, { level: zlib.constants.Z_BEST_SPEED });
+    res.writeHead(statusCode, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+      "Content-Encoding": "gzip",
+      Vary: "Accept-Encoding",
+    });
+    res.end(compressed);
+    return;
+  }
+
   res.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
+    Vary: "Accept-Encoding",
   });
-  res.end(JSON.stringify(payload, null, 2));
+  res.end(body);
 }
 
 function parseBotStatusOutput(stdout) {
@@ -815,9 +879,9 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && req.url === "/api/bot/status") {
   try {
     const status = await buildBotStatus();
-    sendJson(res, 200, status);
+    sendJson(req, res, 200, status);
   } catch (err) {
-    sendJson(res, 500, { ok: false, error: err.message || String(err) });
+    sendJson(req, res, 500, { ok: false, error: err.message || String(err) });
   }
   return;
 }
@@ -825,10 +889,10 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "POST" && req.url === "/api/bot/start") {
   try {
     const result = await startBotProcesses();
-    sendJson(res, 200, result);
+    sendJson(req, res, 200, result);
     return;
   } catch (err) {
-    sendJson(res, 500, { ok: false, error: err.message || String(err) });
+    sendJson(req, res, 500, { ok: false, error: err.message || String(err) });
     return;
   }
 }
@@ -836,10 +900,10 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "POST" && req.url === "/api/bot/stop") {
   try {
     const result = await stopBotProcesses();
-    sendJson(res, 200, result);
+    sendJson(req, res, 200, result);
     return;
   } catch (err) {
-    sendJson(res, 500, { ok: false, error: err.message || String(err) });
+    sendJson(req, res, 500, { ok: false, error: err.message || String(err) });
     return;
   }
 }
@@ -847,10 +911,10 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "POST" && req.url === "/api/history/reset") {
     try {
       const result = await resetHistoryFiles();
-      sendJson(res, result.ok ? 200 : 409, result);
+      sendJson(req, res, result.ok ? 200 : 409, result);
       return;
     } catch (err) {
-      sendJson(res, 500, { ok: false, error: err.message || String(err) });
+      sendJson(req, res, 500, { ok: false, error: err.message || String(err) });
       return;
     }
   }
@@ -898,10 +962,10 @@ const server = http.createServer(async (req, res) => {
       payload.exchange = exchange;
       payload.botStatus = await buildBotStatus();
       
-      sendJson(res, 200, payload);
+      sendJson(req, res, 200, payload);
       return;
     } catch (err) {
-      sendJson(res, 500, {
+      sendJson(req, res, 500, {
         error: err.body || err.message || String(err),
       });
       return;
@@ -925,7 +989,7 @@ const server = http.createServer(async (req, res) => {
           const executionId = parsed.executionId;
 
           if (!executionId) {
-            sendJson(res, 400, { ok: false, error: "executionId missing" });
+            sendJson(req, res, 400, { ok: false, error: "executionId missing" });
             return;
           }
 
@@ -940,9 +1004,9 @@ const server = http.createServer(async (req, res) => {
           const result = await forceCloseExecutionById(state, executionId);
           writeJsonSafe(STATE_FILE, state);
 
-          sendJson(res, result.ok ? 200 : 409, result);
+          sendJson(req, res, result.ok ? 200 : 409, result);
         } catch (err) {
-          sendJson(res, 500, {
+          sendJson(req, res, 500, {
             ok: false,
             error: err.body || err.message || String(err),
           });
@@ -951,7 +1015,7 @@ const server = http.createServer(async (req, res) => {
 
       return;
     } catch (err) {
-      sendJson(res, 500, {
+      sendJson(req, res, 500, {
         ok: false,
         error: err.body || err.message || String(err),
       });

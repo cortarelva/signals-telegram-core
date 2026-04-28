@@ -25,6 +25,10 @@ const LOOKAHEAD_BARS = Number(process.env.OPPORTUNITY_LOOKAHEAD_BARS || 8);
 const MIN_TARGET_MOVE_ATR = Number(process.env.OPPORTUNITY_MIN_TARGET_MOVE_ATR || 1.8);
 const MAX_MAE_ATR = Number(process.env.OPPORTUNITY_MAX_MAE_ATR || 0.8);
 const MIN_CLOSE_PROGRESS = Number(process.env.OPPORTUNITY_MIN_CLOSE_PROGRESS || 0.45);
+const REQUESTED_DIRECTIONS = String(process.env.OPPORTUNITY_DIRECTIONS || "LONG,SHORT")
+  .split(",")
+  .map((value) => normalizeDirection(value))
+  .filter(Boolean);
 const MAX_EVENT_OVERLAP_BARS = Number(
   process.env.OPPORTUNITY_MAX_EVENT_OVERLAP_BARS || Math.max(1, Math.floor(LOOKAHEAD_BARS / 2))
 );
@@ -95,12 +99,33 @@ function classifyArchetype({
   maeAtr,
   closeProgress,
   relativeVol,
+  direction,
 }) {
   const nearPullback = indicators?.nearPullback === true;
   const stackedEma = indicators?.stackedEma === true;
   const isTrend = indicators?.isTrend === true;
   const isRange = indicators?.isRange === true;
   const rsi = Number(indicators?.rsi || 0);
+
+  if (direction === "SHORT") {
+    if (!isTrend && !isRange && relativeVol >= 0.85 && closeProgress >= 0.5) {
+      return "breakdown_continuation_base";
+    }
+
+    if (maeAtr <= 0.4 && relativeVol >= 1.1) {
+      return "clean_impulse_breakdown";
+    }
+
+    if (isTrend && !nearPullback && moveAtr >= 2) {
+      return "trend_acceleration_breakdown";
+    }
+
+    if (rsi <= 38 && closeProgress >= 0.5) {
+      return "late_selloff_extension";
+    }
+
+    return "generic_breakdown";
+  }
 
   if (isTrend && nearPullback && stackedEma && relativeVol >= 0.9) {
     return "trend_continuation_pullback";
@@ -181,6 +206,7 @@ function buildEventRow({
       maeAtr,
       closeProgress,
       relativeVol: Number.isFinite(relativeVol) ? relativeVol : 0,
+      direction,
     }),
     candleIndex,
     signalTs: candle.closeTime,
@@ -221,7 +247,7 @@ function buildEventRow({
   };
 }
 
-function mineOpportunityEventsForSymbol(symbol, symbolData) {
+function mineOpportunityEventsForSymbol(symbol, symbolData, directions = REQUESTED_DIRECTIONS) {
   const { cfg, ltfCandles, htfCandles } = symbolData;
   const rows = [];
   const nextAllowedByDirection = { LONG: -1, SHORT: -1 };
@@ -244,7 +270,7 @@ function mineOpportunityEventsForSymbol(symbol, symbolData) {
 
     const lookaheadCandles = ltfCandles.slice(i + 1, i + 1 + LOOKAHEAD_BARS);
 
-    for (const direction of ["LONG", "SHORT"]) {
+    for (const direction of directions) {
       if (i < nextAllowedByDirection[direction]) continue;
 
       const eventRow = buildEventRow({
@@ -334,6 +360,7 @@ function buildSummary(rows, symbols, unavailableSymbols) {
     minTargetMoveAtr: MIN_TARGET_MOVE_ATR,
     maxMaeAtr: MAX_MAE_ATR,
     minCloseProgress: MIN_CLOSE_PROGRESS,
+    directions: REQUESTED_DIRECTIONS,
     maxEventOverlapBars: MAX_EVENT_OVERLAP_BARS,
     total: rows.length,
     symbols,

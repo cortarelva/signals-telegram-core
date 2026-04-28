@@ -37,6 +37,33 @@ function avg(values) {
   return nums.reduce((sum, value) => sum + value, 0) / nums.length;
 }
 
+function timeframeToMinutes(timeframe) {
+  const match = String(timeframe || "").trim().match(/^(\d+)([mhd])$/i);
+  if (!match) return null;
+  const amount = Number(match[1]);
+  const unit = String(match[2] || "").toLowerCase();
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  if (unit === "m") return amount;
+  if (unit === "h") return amount * 60;
+  if (unit === "d") return amount * 24 * 60;
+  return null;
+}
+
+function deriveSummarizeOptions(timeframe) {
+  const minutes = timeframeToMinutes(timeframe);
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    return {
+      lookback1hBars: 12,
+      lookback4hBars: 48,
+    };
+  }
+
+  return {
+    lookback1hBars: Math.max(1, Math.round(60 / minutes)),
+    lookback4hBars: Math.max(1, Math.round(240 / minutes)),
+  };
+}
+
 function summarizeCandles(candles, options = {}) {
   const rows = Array.isArray(candles) ? candles : [];
   const lookback1hBars = Number(options.lookback1hBars || 12);
@@ -109,7 +136,8 @@ function buildBtcRegimeSnapshot({
   asOf = new Date().toISOString(),
 } = {}) {
   const rows = candlesBySymbol || {};
-  const btc = summarizeCandles(rows[btcSymbol]);
+  const summarizeOptions = deriveSummarizeOptions(timeframe);
+  const btc = summarizeCandles(rows[btcSymbol], summarizeOptions);
 
   if (!btc) {
     return {
@@ -137,7 +165,7 @@ function buildBtcRegimeSnapshot({
   const altSummaries = altSymbols
     .map((symbol) => ({
       symbol,
-      metrics: summarizeCandles(rows[symbol]),
+      metrics: summarizeCandles(rows[symbol], summarizeOptions),
     }))
     .filter((row) => row.metrics && Number.isFinite(row.metrics.return1hPct));
 
@@ -238,5 +266,7 @@ function buildBtcRegimeSnapshot({
 module.exports = {
   summarizeCandles,
   classifyDirection,
+  timeframeToMinutes,
+  deriveSummarizeOptions,
   buildBtcRegimeSnapshot,
 };

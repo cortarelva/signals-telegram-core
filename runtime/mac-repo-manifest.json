@@ -1,0 +1,142 @@
+{
+  "generatedAt": "2026-04-28T19:29:38.359Z",
+  "role": "mac-superset",
+  "repoRoot": "/Users/joel/Documents/CoddingStuff/TorusAiTrading",
+  "git": {
+    "branch": "codex/repo-sync-cleanup",
+    "head": "963c2599c537b3725585d5c1e101e5cb69af3db7",
+    "mergeBaseWithOriginMain": "a82d0546c4551954f39dfc659cc9a42ef1814aa8",
+    "statusShort": "M dashboard/app.js\n M dashboard/index.html\n M dashboard/styles.css\n M package.json\n M research/mine-opportunity-events.js\n M runtime/adaptive-config.json\n M runtime/config/load-runtime-config.js\n M runtime/dashboard-server.js\n M tests/mine-opportunity-events.test.js\n?? .tmp-bdcb-15m.json\n?? botstart-btc-gated-bearish-lab.js\n?? botstatus-btc-gated-bearish-lab.js\n?? botstop-btc-gated-bearish-lab.js\n?? dashboardstart-btc-gated-bearish-lab.js\n?? dashboardstatus-btc-gated-bearish-lab.js\n?? dashboardstop-btc-gated-bearish-lab.js\n?? docs/DUAL_VERSION_RECONCILIATION.md\n?? research/analyze-btc-factor-context.js\n?? research/btc-factor-context-notes.md\n?? research/build-promotion-gate-report.js\n?? research/compare-btc-gated-breakdown.js\n?? research/ernie-chan-playbook.md\n?? research/monte-carlo-promotion-notes.md\n?? research/monte-carlo-trade-list.js\n?? research/run-tradfi-promotion-gates.js\n?? research/timothy-masters-playbook.md\n?? runtime/adaptive-config.btc-gated-bearish-lab.json\n?? runtime/btc-context-gate.js\n?? runtime/btc-gated-bearish-lab.env.sh\n?? runtime/btc-gated-bearish-lab/\n?? runtime/btc-regime-context.js\n?? runtime/local-repo-manifest.json\n?? runtime/mac-repo-manifest.json\n?? runtime/run-btc-gated-bearish-lab-dashboard.sh\n?? runtime/run-btc-gated-bearish-lab-loop.sh\n?? runtime/strategy-config.generated.btc-gated-bearish-lab.json\n?? runtime/strategy-config.json.bak-20260427-083513\n?? scripts/build-repo-manifest.js\n?? scripts/compare-repo-manifests.js\n?? start-btc-gated-bearish-lab.sh\n?? status-btc-gated-bearish-lab.sh\n?? stop-btc-gated-bearish-lab.sh\n?? strategies/index.js.bak-20260427-083513\n?? tests/analyze-btc-factor-context.test.js\n?? tests/btc-context-gate.test.js\n?? tests/btc-regime-context.test.js\n?? tests/build-promotion-gate-report.test.js\n?? tests/compare-btc-gated-breakdown.test.js\n?? tests/monte-carlo-trade-list.test.js\n?? tests/run-tradfi-promotion-gates.test.js",
+    "statusPorcelain": "M dashboard/app.js\n M dashboard/index.html\n M dashboard/styles.css\n M package.json\n M research/mine-opportunity-events.js\n M runtime/adaptive-config.json\n M runtime/config/load-runtime-config.js\n M runtime/dashboard-server.js\n M tests/mine-opportunity-events.test.js\n?? .tmp-bdcb-15m.json\n?? botstart-btc-gated-bearish-lab.js\n?? botstatus-btc-gated-bearish-lab.js\n?? botstop-btc-gated-bearish-lab.js\n?? dashboardstart-btc-gated-bearish-lab.js\n?? dashboardstatus-btc-gated-bearish-lab.js\n?? dashboardstop-btc-gated-bearish-lab.js\n?? docs/DUAL_VERSION_RECONCILIATION.md\n?? research/analyze-btc-factor-context.js\n?? research/btc-factor-context-notes.md\n?? research/build-promotion-gate-report.js\n?? research/compare-btc-gated-breakdown.js\n?? research/ernie-chan-playbook.md\n?? research/monte-carlo-promotion-notes.md\n?? research/monte-carlo-trade-list.js\n?? research/run-tradfi-promotion-gates.js\n?? research/timothy-masters-playbook.md\n?? runtime/adaptive-config.btc-gated-bearish-lab.json\n?? runtime/btc-context-gate.js\n?? runtime/btc-gated-bearish-lab.env.sh\n?? runtime/btc-gated-bearish-lab/\n?? runtime/btc-regime-context.js\n?? runtime/local-repo-manifest.json\n?? runtime/mac-repo-manifest.json\n?? runtime/run-btc-gated-bearish-lab-dashboard.sh\n?? runtime/run-btc-gated-bearish-lab-loop.sh\n?? runtime/strategy-config.generated.btc-gated-bearish-lab.json\n?? runtime/strategy-config.json.bak-20260427-083513\n?? scripts/build-repo-manifest.js\n?? scripts/compare-repo-manifests.js\n?? start-btc-gated-bearish-lab.sh\n?? status-btc-gated-bearish-lab.sh\n?? stop-btc-gated-bearish-lab.sh\n?? strategies/index.js.bak-20260427-083513\n?? tests/analyze-btc-factor-context.test.js\n?? tests/btc-context-gate.test.js\n?? tests/btc-regime-context.test.js\n?? tests/build-promotion-gate-report.test.js\n?? tests/compare-btc-gated-breakdown.test.js\n?? tests/monte-carlo-trade-list.test.js\n?? tests/run-tradfi-promotion-gates.test.js"
+  },
+  "baselineRefs": {
+    "liveConfirmed": {
+      "branch": "codex/repo-sync-cleanup",
+      "head": "9653eb0c0e8b5cde836fbaa4449aa8e18b1b1d13"
+    },
+    "githubClean": {
+      "branch": "codex/repo-sync-cleanup",
+      "head": "f064048f3a83f06617ab9b19554bf2a6d4689910"
+    },
+    "tuneCommit": {
+      "head": "cd940aa36d27c028af46d015f14e53422c8f120d"
+    }
+  },
+  "packageMeta": {
+    "name": "torus-ai-trading",
+    "version": "1.0.0",
+    "packageJsonSha256": "199f6c924221636594fc84c814fc8eed60e735535373e81118989ba98a1c1eaa",
+    "packageLockSha256": "7b53c83b86d0d839181f236eaee2bdd387ad67652f9f8cd55c2e68c0f183abca"
+  },
+  "env": {
+    "TF": "5m",
+    "HTF_TF": "1d",
+    "EXECUTION_MODE": "binance_real",
+    "CONTINUATION_RANKER_MAX_PER_CYCLE": "1",
+    "ENABLE_TELEGRAM": "1   #0-disable, 1-enable",
+    "LIVE_ALLOW_TRADFI": "1",
+    "EXTERNAL_HISTORY_PROVIDER": "auto",
+    "EXTERNAL_HISTORY_TRADFI_ONLY": "1",
+    "EXTERNAL_HISTORY_AUTO_TRADFI": "1"
+  },
+  "liveUniverse": {
+    "ETHUSDC": {
+      "tf": "1h",
+      "htfTf": "1d",
+      "enabledStrategies": [
+        "CIPHER_CONTINUATION_SHORT"
+      ],
+      "extraRuns": []
+    },
+    "ADAUSDC": {
+      "tf": "5m",
+      "htfTf": "1d",
+      "enabledStrategies": [
+        "CIPHER_CONTINUATION_LONG"
+      ],
+      "extraRuns": []
+    },
+    "LINKUSDC": {
+      "tf": "5m",
+      "htfTf": "1d",
+      "enabledStrategies": [
+        "CIPHER_CONTINUATION_LONG"
+      ],
+      "extraRuns": []
+    },
+    "1000SHIBUSDC": {
+      "tf": "15m",
+      "htfTf": "1d",
+      "enabledStrategies": [
+        "CIPHER_CONTINUATION_SHORT"
+      ],
+      "extraRuns": []
+    }
+  },
+  "hotspots": {
+    "package.json": {
+      "exists": true,
+      "sha256": "199f6c924221636594fc84c814fc8eed60e735535373e81118989ba98a1c1eaa"
+    },
+    "package-lock.json": {
+      "exists": true,
+      "sha256": "7b53c83b86d0d839181f236eaee2bdd387ad67652f9f8cd55c2e68c0f183abca"
+    },
+    "runtime/torus-ai-trading.js": {
+      "exists": true,
+      "sha256": "3619f1a0e8b30aba361590792011551c352f759580ca1c49a9f103c58949abd2"
+    },
+    "runtime/dashboard-server.js": {
+      "exists": true,
+      "sha256": "34c6c63d8693d1e6f2441261788cdf09218fd1388f8f1c655bf43ce0da4e1eb0"
+    },
+    "runtime/config/load-runtime-config.js": {
+      "exists": true,
+      "sha256": "182e2a8593869a7862e5b32f15f3e6140d7c78d2082f762a3fde373b65de0bc4"
+    },
+    "runtime/futures-executor.js": {
+      "exists": true,
+      "sha256": "da0c53f7da4abb86a72371eb10e04f6ccebd2f41d24eb9c41877330c0248b5eb"
+    },
+    "runtime/risk-manager.js": {
+      "exists": true,
+      "sha256": "9fcc3a864237c24c4b69436f4e3a9ab304e228da437b33fabc843caa8d0253a0"
+    },
+    "runtime/strategy-config.json": {
+      "exists": true,
+      "sha256": "392fab66b4f609fa27a9f96d351566ec1f3a88fa5fd2d2fdab9661da923b941b"
+    },
+    "runtime/btc-regime-context.js": {
+      "exists": true,
+      "sha256": "a39f552858d6de865c3d9f4c61696af766469b67c5d7ce1407f4d4dade309acf"
+    },
+    "strategies/index.js": {
+      "exists": true,
+      "sha256": "411770e801240ccfef0344b75212c505f481d514a0bc07be717003c0ac10f09d"
+    },
+    "strategies/cipher-continuation-long-strategy.js": {
+      "exists": true,
+      "sha256": "7ae1bc666a0798f9f61b2f170c2bb9571de94de9269ae34a784bde063372f26e"
+    },
+    "dashboard/app.js": {
+      "exists": true,
+      "sha256": "460015a4b144cb5e3a252b80fe5f31ce36490e8252ffc1b86225170ce80b20f7"
+    },
+    "dashboard/index.html": {
+      "exists": true,
+      "sha256": "2907370211ee1c9d090c83f528f71cfc786249f2e6d516b6c7272c7a2080e33f"
+    },
+    "dashboard/styles.css": {
+      "exists": true,
+      "sha256": "9713ed1a66d6780ed47d095ddbb10358f487215a974ee9892fa51efe634c8eb2"
+    },
+    "research/build-promotion-gate-report.js": {
+      "exists": true,
+      "sha256": "f2b666ae001fd228cfa3be3c54542e7145f77e77f9794eed9c98d48f96f939e4"
+    },
+    "docs/MAC_ITERATION_HANDOFF_2026-04-28.md": {
+      "exists": false,
+      "sha256": null
+    }
+  }
+}

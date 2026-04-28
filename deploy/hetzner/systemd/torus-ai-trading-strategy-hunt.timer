@@ -1,0 +1,11 @@
+[Unit]
+Description=Run TorusAiTrading strategy hunt every 6 hours
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=6h
+Persistent=true
+Unit=torus-ai-trading-strategy-hunt.service
+
+[Install]
+WantedBy=timers.target

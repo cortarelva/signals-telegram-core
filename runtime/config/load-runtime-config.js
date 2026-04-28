@@ -5,6 +5,14 @@ const STRATEGY_FILE = path.join(__dirname, "..", "strategy-config.json");
 const ADAPTIVE_FILE = path.join(__dirname, "..", "adaptive-config.json");
 const DEFAULTS_KEY = "DEFAULTS";
 
+function resolveStrategyFilePath() {
+  return process.env.STRATEGY_CONFIG_FILE_PATH || STRATEGY_FILE;
+}
+
+function resolveAdaptiveFilePath() {
+  return process.env.ADAPTIVE_CONFIG_FILE_PATH || ADAPTIVE_FILE;
+}
+
 function loadJSON(file) {
   try {
     return JSON.parse(fs.readFileSync(file, "utf8"));
@@ -160,29 +168,12 @@ function buildFlatLegacyConfig(b = {}, a = {}) {
   };
 }
 
-function resolveConfigPath(explicitPath, envKey, fallbackPath) {
-  if (explicitPath) return explicitPath;
-  const fromEnv = process.env[envKey];
-  if (fromEnv) return fromEnv;
-  return fallbackPath;
-}
-
 function loadRuntimeConfigFiles({
-  strategyFile,
-  adaptiveFile,
+  strategyFile = resolveStrategyFilePath(),
+  adaptiveFile = resolveAdaptiveFilePath(),
 } = {}) {
-  const resolvedStrategyFile = resolveConfigPath(
-    strategyFile,
-    "STRATEGY_CONFIG_FILE_PATH",
-    STRATEGY_FILE
-  );
-  const resolvedAdaptiveFile = resolveConfigPath(
-    adaptiveFile,
-    "ADAPTIVE_CONFIG_FILE_PATH",
-    ADAPTIVE_FILE
-  );
-  const base = loadJSON(resolvedStrategyFile);
-  const adaptive = loadJSON(resolvedAdaptiveFile);
+  const base = loadJSON(strategyFile);
+  const adaptive = loadJSON(adaptiveFile);
   const baseDefaults = isPlainObject(base?.[DEFAULTS_KEY])
     ? base[DEFAULTS_KEY]
     : {};

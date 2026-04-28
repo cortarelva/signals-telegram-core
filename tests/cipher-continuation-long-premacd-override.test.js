@@ -23,7 +23,7 @@ Module._load = function mockedLoad(request, parent, isMain) {
             return { macd: 0.22, signal: 0.16, hist: 0.06 };
           }
           if (index === arr.length - 2) {
-            return { macd: 0.20, signal: 0.16, hist: 0.04 };
+            return { macd: 0.2, signal: 0.16, hist: 0.04 };
           }
           if (index === arr.length - 1) {
             return { macd: 0.18, signal: 0.16, hist: 0.02 };
@@ -65,12 +65,48 @@ function makeLongCandles() {
     volume: 100,
   }));
 
-  candles[54] = { open: 99.95, high: 100.18, low: 99.96, close: 100.05, volume: 100 };
-  candles[55] = { open: 100.02, high: 100.22, low: 99.98, close: 100.08, volume: 100 };
-  candles[56] = { open: 100.04, high: 100.18, low: 99.99, close: 100.07, volume: 100 };
-  candles[57] = { open: 100.03, high: 100.20, low: 100.00, close: 100.09, volume: 100 };
-  candles[58] = { open: 100.01, high: 100.16, low: 99.97, close: 100.06, volume: 100 };
-  candles[59] = { open: 100.01, high: 100.22, low: 99.99, close: 100.12, volume: 80 };
+  candles[54] = {
+    open: 99.95,
+    high: 100.18,
+    low: 99.96,
+    close: 100.05,
+    volume: 100,
+  };
+  candles[55] = {
+    open: 100.02,
+    high: 100.22,
+    low: 99.98,
+    close: 100.08,
+    volume: 100,
+  };
+  candles[56] = {
+    open: 100.04,
+    high: 100.18,
+    low: 99.99,
+    close: 100.07,
+    volume: 100,
+  };
+  candles[57] = {
+    open: 100.03,
+    high: 100.2,
+    low: 100,
+    close: 100.09,
+    volume: 100,
+  };
+  candles[58] = {
+    open: 100.01,
+    high: 100.16,
+    low: 99.97,
+    close: 100.06,
+    volume: 100,
+  };
+  candles[59] = {
+    open: 100.01,
+    high: 100.22,
+    low: 99.99,
+    close: 100.12,
+    volume: 80,
+  };
 
   return candles;
 }

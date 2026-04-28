@@ -96,6 +96,62 @@ test("buildEventRow captures a valid long opportunity snapshot with archetype fe
   assert.equal(row.stackedEma, true);
 });
 
+test("buildEventRow captures a valid short opportunity snapshot with bearish archetype features", () => {
+  const row = buildEventRow({
+    symbol: "ADAUSDC",
+    candleIndex: 84,
+    candle: {
+      close: 100,
+      closeTime: Date.UTC(2026, 3, 27, 15, 10, 0),
+      volume: 130,
+    },
+    lookaheadCandles: [
+      { high: 100.3, low: 99.2, close: 99.5 },
+      { high: 100.1, low: 98.3, close: 98.9 },
+      { high: 99.8, low: 97.8, close: 98.4 },
+    ],
+    ctx: {
+      indicators: {
+        atr: 1,
+        atrPct: 0.01,
+        adx: 34,
+        rsi: 32,
+        prevRsi: 35,
+        ema20: 101.1,
+        ema50: 101.6,
+        ema200: 104.2,
+        bullish: false,
+        bullishFast: false,
+        nearEma20: false,
+        nearEma50: false,
+        nearPullback: false,
+        stackedEma: false,
+        isTrend: false,
+        isRange: false,
+        emaSeparationPct: 0.007,
+        emaSlopePct: -0.003,
+        distToEma20: -1.1,
+        distToEma50: -1.6,
+        avgVol: 100,
+      },
+      nearestSupport: { price: 97.1 },
+      nearestResistance: { price: 101.8 },
+    },
+    direction: "SHORT",
+  });
+
+  assert.ok(row);
+  assert.equal(row.symbol, "ADAUSDC");
+  assert.equal(row.direction, "SHORT");
+  assert.equal(row.archetype, "breakdown_continuation_base");
+  assert.equal(row.relativeVol, 1.3);
+  assert.equal(row.moveAtr, 2.2);
+  assert.equal(row.maeAtr, 0.3);
+  assert.equal(row.closeProgress, 0.727273);
+  assert.equal(row.isTrend, false);
+  assert.equal(row.isRange, false);
+});
+
 test("buildSummary aggregates counts and averages by direction, symbol, and archetype", () => {
   const rows = [
     {

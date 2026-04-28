@@ -45,19 +45,37 @@ const BINANCE_FUTURES_BASE =
 const PROJECT_ROOT = path.join(__dirname, "..");
 const STATE_FILE =
   process.env.STATE_FILE_PATH || path.join(__dirname, "state.json");
-const BASE_CONFIG_FILE = path.join(__dirname, "strategy-config.json");
-const GENERATED_CONFIG_FILE = path.join(__dirname, "strategy-config.generated.json");
+const BASE_CONFIG_FILE =
+  process.env.STRATEGY_CONFIG_FILE_PATH ||
+  path.join(__dirname, "strategy-config.json");
+const GENERATED_CONFIG_FILE =
+  process.env.STRATEGY_GENERATED_CONFIG_FILE_PATH ||
+  path.join(__dirname, "strategy-config.generated.json");
 const METRICS_FILE =
   process.env.EXECUTION_METRICS_FILE_PATH ||
   path.join(__dirname, "execution-metrics.json");
 const ORDERS_LOG_FILE =
   process.env.ORDERS_LOG_FILE_PATH || path.join(__dirname, "orders-log.json");
-const PERFORMANCE_BASELINE_FILE = path.join(__dirname, "performance-baseline.json");
-const ADAPTIVE_HISTORY_FILE = path.join(__dirname, "adaptive-history.json");
+const PERFORMANCE_BASELINE_FILE =
+  process.env.PERFORMANCE_BASELINE_FILE_PATH ||
+  path.join(__dirname, "performance-baseline.json");
+const ADAPTIVE_HISTORY_FILE =
+  process.env.ADAPTIVE_HISTORY_FILE_PATH ||
+  path.join(__dirname, "adaptive-history.json");
 const PID_FILE = path.join(__dirname, ".bot-pids.json");
+const BOT_STATUS_SCRIPT =
+  process.env.BOT_STATUS_SCRIPT_PATH || path.join(PROJECT_ROOT, "botstatus.js");
+const BOT_START_SCRIPT =
+  process.env.BOT_START_SCRIPT_PATH || path.join(PROJECT_ROOT, "botstart.js");
+const BOT_STOP_SCRIPT =
+  process.env.BOT_STOP_SCRIPT_PATH || path.join(PROJECT_ROOT, "botstop.js");
 
-const RESEARCH_JSON_FILE = path.join(__dirname, "..", "research", "consolidated-trades.json");
-const RESEARCH_CSV_FILE = path.join(__dirname, "..", "research", "consolidated-trades.csv");
+const RESEARCH_JSON_FILE =
+  process.env.RESEARCH_JSON_FILE_PATH ||
+  path.join(__dirname, "..", "research", "consolidated-trades.json");
+const RESEARCH_CSV_FILE =
+  process.env.RESEARCH_CSV_FILE_PATH ||
+  path.join(__dirname, "..", "research", "consolidated-trades.csv");
 
 const PUBLIC_DIR = path.join(__dirname, "..", "dashboard");
 const DASHBOARD_RAW_SIGNAL_LIMIT = 1000;
@@ -918,12 +936,12 @@ function parseBotStatusOutput(stdout) {
   };
 }
 
-function runNodeScript(scriptName) {
+function runNodeScript(scriptPath) {
   return new Promise((resolve, reject) => {
     execFile(
       process.execPath,
-      [path.join(PROJECT_ROOT, scriptName)],
-      { cwd: PROJECT_ROOT },
+      [scriptPath],
+      { cwd: PROJECT_ROOT, env: process.env },
       (error, stdout, stderr) => {
         if (error) {
           reject(new Error((stderr || stdout || error.message || "").trim()));
@@ -941,12 +959,12 @@ function runNodeScript(scriptName) {
 }
 
 async function buildBotStatus() {
-  const result = await runNodeScript("botstatus.js");
+  const result = await runNodeScript(BOT_STATUS_SCRIPT);
   return parseBotStatusOutput(result.stdout);
 }
 
 async function startBotProcesses() {
-  const result = await runNodeScript("botstart.js");
+  const result = await runNodeScript(BOT_START_SCRIPT);
   const status = await buildBotStatus();
 
   return {
@@ -957,7 +975,7 @@ async function startBotProcesses() {
 }
 
 async function stopBotProcesses() {
-  const result = await runNodeScript("botstop.js");
+  const result = await runNodeScript(BOT_STOP_SCRIPT);
   const status = await buildBotStatus();
 
   return {

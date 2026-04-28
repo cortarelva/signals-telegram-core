@@ -1,0 +1,13 @@
+[Unit]
+Description=TorusAiTrading Strategy Hunt
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=torus
+WorkingDirectory=/opt/TorusAiTrading
+ExecStart=/usr/bin/bash /opt/TorusAiTrading/runtime/run-strategy-hunt.sh
+
+[Install]
+WantedBy=multi-user.target

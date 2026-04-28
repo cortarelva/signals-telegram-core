@@ -151,6 +151,12 @@ h2 {
   color: var(--muted);
 }
 
+.context-summary {
+  margin: 0 0 18px;
+  line-height: 1.6;
+  font-size: 0.96rem;
+}
+
 .hero-text {
   max-width: 62ch;
   line-height: 1.6;

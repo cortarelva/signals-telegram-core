@@ -258,6 +258,26 @@ function clearExternalHistoryRetryState(cacheKey) {
   }
 }
 
+function mergeExternalHistoryRows(existingRows = [], incomingRows = []) {
+  const merged = new Map();
+
+  for (const row of [...existingRows, ...incomingRows]) {
+    const openTime = Number(row?.openTime || 0);
+    if (!Number.isFinite(openTime) || openTime <= 0) continue;
+    merged.set(openTime, {
+      openTime,
+      open: Number(row.open),
+      high: Number(row.high),
+      low: Number(row.low),
+      close: Number(row.close),
+      volume: Number(row.volume || 0),
+      closeTime: Number(row.closeTime || 0),
+    });
+  }
+
+  return [...merged.values()].sort((a, b) => a.openTime - b.openTime);
+}
+
 function getCacheFreshUntilMs(rows, interval) {
   const intervalMs = intervalToMs(interval);
   if (!intervalMs || !Array.isArray(rows) || rows.length === 0) return 0;
@@ -286,6 +306,33 @@ function getCachedExternalHistoryRows(cacheKey, interval, total, options = {}) {
     freshUntilMs,
     stale: freshUntilMs > 0 ? nowMs >= freshUntilMs : false,
   };
+}
+
+function estimateExternalHistoryRefreshRows(existingRows, interval, total, options = {}) {
+  if (!Array.isArray(existingRows) || existingRows.length === 0) {
+    return Math.max(1, Number(total || 1));
+  }
+
+  const intervalMs = intervalToMs(interval);
+  if (!intervalMs) return Math.max(1, Number(total || existingRows.length));
+
+  const latest = existingRows[existingRows.length - 1];
+  const latestCloseTime = Number(latest?.closeTime || 0);
+  const nowMs = Number(options.nowMs || Date.now());
+  const warmupBars = Math.max(2, Number(options.warmupBars || 4));
+  const missingBars =
+    Number.isFinite(latestCloseTime) && latestCloseTime > 0
+      ? Math.max(0, Math.ceil((nowMs - latestCloseTime) / intervalMs))
+      : 0;
+  const missingWindowBars = Math.max(0, Number(total || 0) - existingRows.length);
+
+  return Math.max(
+    1,
+    Math.min(
+      Math.max(1, Number(total || existingRows.length)),
+      missingBars + missingWindowBars + warmupBars
+    )
+  );
 }
 
 function pickTwelveDataSymbol(symbol, env = process.env) {
@@ -577,15 +624,15 @@ async function fetchKlinesFromTwelveData(symbol, interval, total, options = {}) 
   if (freshCache?.rows?.length) {
     return freshCache.rows;
   }
+  const staleCache = getCachedExternalHistoryRows(
+    cacheKey,
+    resolved.outputInterval,
+    total,
+    { nowMs, allowStale: true }
+  );
 
   const retryState = readExternalHistoryRetryState(cacheKey);
   if (retryState && retryState.retryAt > nowMs) {
-    const staleCache = getCachedExternalHistoryRows(
-      cacheKey,
-      resolved.outputInterval,
-      total,
-      { nowMs, allowStale: true }
-    );
     if (staleCache?.rows?.length) {
       return staleCache.rows;
     }
@@ -604,7 +651,35 @@ async function fetchKlinesFromTwelveData(symbol, interval, total, options = {}) 
   const pageSize = Math.max(1, Math.min(5000, total));
 
   try {
-    while (rows.length < total && safety < 20) {
+    if (staleCache?.rows?.length) {
+      const refreshRows = estimateExternalHistoryRefreshRows(
+        staleCache.rows,
+        resolved.outputInterval,
+        total,
+        {
+          nowMs,
+          warmupBars: Number(env.EXTERNAL_HISTORY_REFRESH_WARMUP_BARS || 4),
+        }
+      );
+      const batch = await fetchTwelveDataBatch({
+        ticker,
+        interval: resolved.requestInterval,
+        total: refreshRows,
+        apiKey,
+        exchange,
+        httpGet: options.httpGet,
+        endDate: null,
+        env,
+        sleep: options.sleep,
+        now: options.now,
+      });
+      const normalized = batch
+        .map((row) => normalizeTwelveDataRow(row, resolved.outputInterval))
+        .filter(Boolean)
+        .sort((a, b) => a.openTime - b.openTime);
+
+      rows.push(...mergeExternalHistoryRows(staleCache.rows, normalized));
+    } else while (rows.length < total && safety < 20) {
       safety += 1;
       const batch = await fetchTwelveDataBatch({
         ticker,
@@ -649,12 +724,6 @@ async function fetchKlinesFromTwelveData(symbol, interval, total, options = {}) 
       });
     }
 
-    const staleCache = getCachedExternalHistoryRows(
-      cacheKey,
-      resolved.outputInterval,
-      total,
-      { nowMs, allowStale: true }
-    );
     if (staleCache?.rows?.length) {
       return staleCache.rows;
     }
@@ -735,8 +804,10 @@ module.exports = {
   readExternalHistoryRetryState,
   writeExternalHistoryRetryState,
   clearExternalHistoryRetryState,
+  mergeExternalHistoryRows,
   getCacheFreshUntilMs,
   getCachedExternalHistoryRows,
+  estimateExternalHistoryRefreshRows,
   normalizeTwelveDataRow,
   getTwelveDataMinIntervalMs,
   getTwelveDataRateLimitBackoffMs,

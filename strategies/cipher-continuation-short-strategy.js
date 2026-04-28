@@ -39,6 +39,9 @@ function evaluateCipherContinuationShortStrategy(ctx) {
   const maxSignalVolRatio = Number(cipherCfg.maxSignalVolRatio ?? 3.5);
   const pullbackBars = Number(cipherCfg.pullbackBars ?? 5);
   const trendMode = String(cipherCfg.trendMode ?? "soft");
+  const macdRolloverMode = String(cipherCfg.macdRolloverMode ?? "strict")
+    .trim()
+    .toLowerCase();
   const ema200BufferPct = Number(cipherCfg.ema200BufferPct ?? 0.0035);
   const maxExtensionAtr = Number(cipherCfg.maxExtensionAtr ?? 1.8);
   const emaTouchAtr = Number(cipherCfg.emaTouchAtr ?? 0.65);
@@ -152,10 +155,17 @@ function evaluateCipherContinuationShortStrategy(ctx) {
   const pullbackStaysBelowEma50 =
     atr > 0 ? pullbackHigh <= ema50 + atr * maxPullbackAboveEma50Atr : false;
 
-  const macdRollingOver =
+  const strictMacdRollingOver =
     macdNow.hist < macdPrev.hist &&
     macdPrev.hist >= macdPrev2.hist &&
     (macdNow.macd <= macdNow.signal || macdNow.hist <= 0);
+  const earlyMacdRollingOver =
+    macdNow.hist < macdPrev.hist &&
+    macdPrev.hist < macdPrev2.hist &&
+    macdNow.macd <= macdPrev.macd;
+  const macdRollingOver =
+    strictMacdRollingOver ||
+    (macdRolloverMode === "early" && earlyMacdRollingOver);
 
   const bearishSignal =
     Number(last.close) < Number(last.open) &&
@@ -278,6 +288,9 @@ function evaluateCipherContinuationShortStrategy(ctx) {
         pullbackTouchesEma20,
         pullbackNearBbBasis,
         pullbackStaysBelowEma50,
+        macdRolloverMode,
+        strictMacdRollingOver,
+        earlyMacdRollingOver,
         macdHist: macdNow.hist,
         prevMacdHist: macdPrev.hist,
         macdRollingOver,
@@ -312,6 +325,9 @@ function evaluateCipherContinuationShortStrategy(ctx) {
         pullbackTouchesEma20,
         pullbackNearBbBasis,
         pullbackStaysBelowEma50,
+        macdRolloverMode,
+        strictMacdRollingOver,
+        earlyMacdRollingOver,
         macdHist: macdNow.hist,
         prevMacdHist: macdPrev.hist,
         macdRollingOver,
@@ -342,6 +358,9 @@ function evaluateCipherContinuationShortStrategy(ctx) {
         pullbackTouchesEma20,
         pullbackNearBbBasis,
         pullbackStaysBelowEma50,
+        macdRolloverMode,
+        strictMacdRollingOver,
+        earlyMacdRollingOver,
         macdHist: macdNow.hist,
         prevMacdHist: macdPrev.hist,
         macdRollingOver,
@@ -381,6 +400,9 @@ function evaluateCipherContinuationShortStrategy(ctx) {
       pullbackTouchesEma20,
       pullbackNearBbBasis,
       pullbackStaysBelowEma50,
+      macdRolloverMode,
+      strictMacdRollingOver,
+      earlyMacdRollingOver,
       macdHist: macdNow.hist,
       prevMacdHist: macdPrev.hist,
       macdRollingOver,

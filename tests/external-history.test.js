@@ -15,6 +15,7 @@ const {
   readExternalHistoryRetryState,
   writeExternalHistoryRetryState,
   clearExternalHistoryRetryState,
+  mergeExternalHistoryRows,
   getCacheFreshUntilMs,
   getTwelveDataDailyLimitBackoffMs,
   getTwelveDataMinIntervalMs,
@@ -25,6 +26,7 @@ const {
   runTwelveDataRateLimited,
   resetTwelveDataRateLimiter,
   resolveExternalHistoryProvider,
+  estimateExternalHistoryRefreshRows,
   fetchKlinesFromTwelveData,
 } = require("../research/external-history");
 
@@ -263,6 +265,61 @@ test("external history cache persists rows and reports freshness", () => {
   }
 });
 
+test("mergeExternalHistoryRows deduplicates by openTime and preserves latest values", () => {
+  const merged = mergeExternalHistoryRows(
+    [
+      { openTime: 1000, open: 1, high: 2, low: 0.5, close: 1.2, volume: 10, closeTime: 1999 },
+      { openTime: 2000, open: 1.2, high: 2.1, low: 1.1, close: 1.8, volume: 12, closeTime: 2999 },
+    ],
+    [
+      { openTime: 2000, open: 1.25, high: 2.2, low: 1.05, close: 1.9, volume: 13, closeTime: 2999 },
+      { openTime: 3000, open: 1.9, high: 2.3, low: 1.7, close: 2.1, volume: 14, closeTime: 3999 },
+    ]
+  );
+
+  assert.equal(merged.length, 3);
+  assert.deepEqual(merged[1], {
+    openTime: 2000,
+    open: 1.25,
+    high: 2.2,
+    low: 1.05,
+    close: 1.9,
+    volume: 13,
+    closeTime: 2999,
+  });
+});
+
+test("estimateExternalHistoryRefreshRows only requests missing bars plus warmup", () => {
+  const rows = [
+    {
+      openTime: Date.parse("2026-04-27T08:00:00.000Z"),
+      open: 1,
+      high: 2,
+      low: 0.5,
+      close: 1.5,
+      volume: 10,
+      closeTime: Date.parse("2026-04-27T08:59:59.999Z"),
+    },
+    {
+      openTime: Date.parse("2026-04-27T09:00:00.000Z"),
+      open: 1.5,
+      high: 2.5,
+      low: 1.4,
+      close: 2.2,
+      volume: 12,
+      closeTime: Date.parse("2026-04-27T09:59:59.999Z"),
+    },
+  ];
+
+  assert.equal(
+    estimateExternalHistoryRefreshRows(rows, "1h", 6, {
+      nowMs: Date.parse("2026-04-27T12:05:00.000Z"),
+      warmupBars: 4,
+    }),
+    6
+  );
+});
+
 test("fetchKlinesFromTwelveData reuses stale cache during daily-credit exhaustion", async () => {
   resetTwelveDataRateLimiter();
 
@@ -329,6 +386,92 @@ test("fetchKlinesFromTwelveData reuses stale cache during daily-credit exhaustio
     assert.deepEqual(first, rows);
     assert.deepEqual(second, rows);
     assert.equal(calls, 1);
+  } finally {
+    clearExternalHistoryRetryState(cacheKey);
+    if (fs.existsSync(cacheFile)) {
+      fs.unlinkSync(cacheFile);
+    }
+    if (fs.existsSync(retryFile)) {
+      fs.unlinkSync(retryFile);
+    }
+  }
+});
+
+test("fetchKlinesFromTwelveData refreshes stale cache incrementally instead of refetching the full window", async () => {
+  resetTwelveDataRateLimiter();
+
+  const symbol = `INC${Date.now()}USDT`;
+  const ticker = symbol.replace(/USDT$/, "");
+  const cacheKey = buildExternalHistoryCacheKey("twelvedata", symbol, "1h", ticker);
+  const cacheFile = getExternalHistoryCacheFile(cacheKey);
+  const retryFile = getExternalHistoryRetryFile(cacheKey);
+  const startMs = Date.parse("2026-04-06T14:00:00.000Z");
+  const cachedRows = Array.from({ length: 500 }, (_, index) => {
+    const openTime = startMs + index * 60 * 60 * 1000;
+    return {
+      openTime,
+      open: 1 + index * 0.001,
+      high: 1.1 + index * 0.001,
+      low: 0.9 + index * 0.001,
+      close: 1.05 + index * 0.001,
+      volume: 100 + index,
+      closeTime: openTime + 60 * 60 * 1000 - 1,
+    };
+  });
+  const calls = [];
+  const httpGet = async (_url, config) => {
+    calls.push(config.params.outputsize);
+    return {
+      data: {
+        status: "ok",
+        values: [
+          {
+            datetime: "2026-04-27 12:00:00",
+            open: "1.38",
+            high: "1.42",
+            low: "1.31",
+            close: "1.39",
+            volume: "130",
+          },
+          {
+            datetime: "2026-04-27 11:00:00",
+            open: "1.30",
+            high: "1.4",
+            low: "1.24",
+            close: "1.38",
+            volume: "125",
+          },
+          {
+            datetime: "2026-04-27 10:00:00",
+            open: "1.25",
+            high: "1.33",
+            low: "1.2",
+            close: "1.30",
+            volume: "120",
+          },
+        ],
+      },
+    };
+  };
+
+  try {
+    writeExternalHistoryCache(cacheKey, cachedRows);
+
+    const rows = await fetchKlinesFromTwelveData(symbol, "1h", 500, {
+      env: {
+        TWELVE_DATA_API_KEY: "token",
+        TWELVE_DATA_MIN_INTERVAL_MS: "1",
+        EXTERNAL_HISTORY_REFRESH_WARMUP_BARS: "4",
+      },
+      httpGet,
+      now: () => Date.parse("2026-04-27T12:05:00.000Z"),
+      sleep: async () => {},
+    });
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0], 7);
+    assert.equal(rows.length, 500);
+    assert.equal(rows.at(-1).close, 1.39);
   } finally {
     clearExternalHistoryRetryState(cacheKey);
     if (fs.existsSync(cacheFile)) {

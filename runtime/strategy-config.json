@@ -209,6 +209,8 @@
         },
         "BREAKDOWN_CONTINUATION_BASE_SHORT": {
           "enabled": true,
+          "maxBaseRecoveryFrac": 0.6,
+          "maxBaseCloseRecoveryFrac": 0.5,
           "EXECUTION": {
             "bucket": "exploratory",
             "riskPerTrade": 0.0025,
@@ -325,6 +327,8 @@
         },
         "BREAKDOWN_CONTINUATION_BASE_SHORT": {
           "enabled": true,
+          "maxBaseRecoveryFrac": 0.6,
+          "maxBaseCloseRecoveryFrac": 0.5,
           "EXECUTION": {
             "bucket": "exploratory",
             "riskPerTrade": 0.0025,

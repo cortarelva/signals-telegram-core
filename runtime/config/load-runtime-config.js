@@ -160,12 +160,29 @@ function buildFlatLegacyConfig(b = {}, a = {}) {
   };
 }
 
+function resolveConfigPath(explicitPath, envKey, fallbackPath) {
+  if (explicitPath) return explicitPath;
+  const fromEnv = process.env[envKey];
+  if (fromEnv) return fromEnv;
+  return fallbackPath;
+}
+
 function loadRuntimeConfigFiles({
-  strategyFile = STRATEGY_FILE,
-  adaptiveFile = ADAPTIVE_FILE,
+  strategyFile,
+  adaptiveFile,
 } = {}) {
-  const base = loadJSON(strategyFile);
-  const adaptive = loadJSON(adaptiveFile);
+  const resolvedStrategyFile = resolveConfigPath(
+    strategyFile,
+    "STRATEGY_CONFIG_FILE_PATH",
+    STRATEGY_FILE
+  );
+  const resolvedAdaptiveFile = resolveConfigPath(
+    adaptiveFile,
+    "ADAPTIVE_CONFIG_FILE_PATH",
+    ADAPTIVE_FILE
+  );
+  const base = loadJSON(resolvedStrategyFile);
+  const adaptive = loadJSON(resolvedAdaptiveFile);
   const baseDefaults = isPlainObject(base?.[DEFAULTS_KEY])
     ? base[DEFAULTS_KEY]
     : {};

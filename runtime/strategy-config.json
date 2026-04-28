@@ -111,7 +111,7 @@
       "enabled": false
     },
     "CIPHER_CONTINUATION_SHORT": {
-      "enabled": false,
+      "enabled": true,
       "emaTouchAtr": 0.8
     },
     "TREND": {
@@ -130,7 +130,7 @@
       "requireRsiFalling": true,
       "maxPullbackPct": 0.03
     },
-    "ENABLED": false
+    "ENABLED": true
   },
   "BTCUSDC": {
     "TF": "1h",
@@ -195,7 +195,7 @@
     "EXTRA_RUNS": [
       {
         "id": "btc_bdcb_15m_exploratory",
-        "ENABLED": true,
+        "ENABLED": false,
         "TF": "15m",
         "HTF_TF": "1d",
         "BREAKDOWN_RETEST_SHORT": {
@@ -227,7 +227,7 @@
         }
       }
     ],
-    "ENABLED": true
+    "ENABLED": false
   },
   "BNBUSDC": {
     "RSI_MIN": 35,
@@ -319,7 +319,7 @@
     "EXTRA_RUNS": [
       {
         "id": "ada_bdcb_15m_exploratory",
-        "ENABLED": true,
+        "ENABLED": false,
         "TF": "15m",
         "HTF_TF": "1d",
         "CIPHER_CONTINUATION_LONG": {
@@ -420,7 +420,7 @@
       "requireRsiFalling": true,
       "maxPullbackPct": 0.025
     },
-    "ENABLED": true
+    "ENABLED": false
   },
   "XAUUSDT": {
     "TF": "1h",
@@ -658,7 +658,7 @@
     "TREND_SHORT": {
       "enabled": false
     },
-    "ENABLED": true
+    "ENABLED": false
   },
   "QQQUSDT": {
     "TF": "1h",
@@ -716,7 +716,7 @@
     "TREND_SHORT": {
       "enabled": false
     },
-    "ENABLED": true
+    "ENABLED": false
   },
   "AAPLUSDT": {
     "TF": "1h",
@@ -774,7 +774,7 @@
     "TREND_SHORT": {
       "enabled": false
     },
-    "ENABLED": true
+    "ENABLED": false
   },
   "SPYUSDT": {
     "TF": "1h",
@@ -832,7 +832,7 @@
     "TREND_SHORT": {
       "enabled": false
     },
-    "ENABLED": true
+    "ENABLED": false
   },
   "AMZNUSDT": {
     "TF": "1h",

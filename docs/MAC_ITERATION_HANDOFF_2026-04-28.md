@@ -7,10 +7,11 @@ Objetivo: por a iteracao do Mac a par do estado real de GitHub, servidor e direc
 
 - O repositorio de referencia e `cortarelva/TorusAiTrading`.
 - O branch de trabalho que concentrou a sync util e `codex/repo-sync-cleanup`.
-- O head atual desse branch, ja sincronizado e validado, e `9653eb0c0e8b5cde836fbaa4449aa8e18b1b1d13`.
+- O head atual desse branch, ja sincronizado no GitHub, e `cd940aa36d27c028af46d015f14e53422c8f120d`.
 - O PR correspondente e o draft PR #1:
   - [PR #1](https://github.com/cortarelva/TorusAiTrading/pull/1)
-- O servidor live foi alinhado com esse commit e ficou a correr limpo.
+- O ultimo estado live confirmado no servidor continua a ser `9653eb0c0e8b5cde836fbaa4449aa8e18b1b1d13`.
+- O tune novo para `ADAUSDC` ja ficou no GitHub, mas o deploy para producao ficou pendente porque o acesso SSH ao servidor passou a devolver timeout em `46.62.151.48:22`.
 - A analise mais recente mostrou que o lane principal nao deve ser simplesmente afrouxado; em geral, relaxar filtros piorou o equilibrio entre frequencia e qualidade.
 - O proximo grande passo deve ser:
   - mergear o codigo mais avancado do Mac sobre esta base limpa e alinhada
@@ -25,8 +26,9 @@ Objetivo: por a iteracao do Mac a par do estado real de GitHub, servidor e direc
 - Repositorio: `cortarelva/TorusAiTrading`
 - Branch principal de trabalho: `codex/repo-sync-cleanup`
 - Commit de referencia atual:
-  - `9653eb0c0e8b5cde836fbaa4449aa8e18b1b1d13`
-- Este commit representa a reconciliacao do estado live testado com o branch do PR.
+  - `cd940aa36d27c028af46d015f14e53422c8f120d`
+- O commit `9653eb0c0e8b5cde836fbaa4449aa8e18b1b1d13` continua a ser a ultima reconciliacao live testada e puxada para o servidor.
+- O commit `cd940aa36d27c028af46d015f14e53422c8f120d` acrescenta a afinacao estreita de `macd_not_reaccelerating` para `ADAUSDC`, o teste novo, e este handoff revisto.
 
 ### Servidor
 
@@ -37,13 +39,15 @@ Objetivo: por a iteracao do Mac a par do estado real de GitHub, servidor e direc
 
 ### Live em producao
 
-No momento em que este handoff foi preparado, o servidor live ja estava alinhado com o branch limpo:
+Ultimo estado live confirmado no servidor:
 
 - path live: `/opt/TorusAiTrading`
 - branch live: `codex/repo-sync-cleanup`
 - HEAD live:
   - `9653eb0c0e8b5cde836fbaa4449aa8e18b1b1d13`
 - `git status --short` no live estava limpo
+- O branch no GitHub esta agora um commit a frente, em `cd940aa36d27c028af46d015f14e53422c8f120d`.
+- O cutover desse ultimo commit ficou pendente por indisponibilidade de SSH durante esta iteracao.
 
 ### Servicos validados
 
@@ -68,7 +72,7 @@ No momento em que este handoff foi preparado, o servidor live ja estava alinhado
   - `openSignals=0`
   - `closedSignals=293`
   - `executions=293`
-  - `cbtcontextState=mixed`
+  - `btcContextState=mixed`
 
 Observacao importante:
 - o dashboard teve de ser reiniciado separadamente depois do cutover

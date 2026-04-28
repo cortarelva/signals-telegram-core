@@ -3,11 +3,14 @@ const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
 const { execFile } = require("child_process");
+const axios = require("axios");
+const { isTradFiSymbol } = require("./symbol-universe");
 const {
   readJsonSafe: readJsonFileSafe,
   writeJsonAtomic,
 } = require("./file-utils");
 const { resolveTradeOutcome } = require("./trade-outcome");
+const { buildBtcRegimeSnapshot } = require("./btc-regime-context");
 
 let getAccountSnapshot = async () => ({
   snapshotType: "unknown",
@@ -35,6 +38,10 @@ const { forceCloseExecutionById } = require("./futures-executor");
 
 const PORT = process.env.DASHBOARD_PORT || 3002;
 const DASHBOARD_HOST = process.env.DASHBOARD_HOST || "127.0.0.1";
+const BINANCE_FUTURES_BASE =
+  process.env.BINANCE_FUTURES_BASE ||
+  process.env.BINANCE_FAPI_BASE_URL ||
+  "https://fapi.binance.com";
 const PROJECT_ROOT = path.join(__dirname, "..");
 const STATE_FILE =
   process.env.STATE_FILE_PATH || path.join(__dirname, "state.json");
@@ -56,6 +63,16 @@ const PUBLIC_DIR = path.join(__dirname, "..", "dashboard");
 const DASHBOARD_RAW_SIGNAL_LIMIT = 1000;
 const DASHBOARD_RAW_CLOSED_LIMIT = 500;
 const DASHBOARD_RAW_EXECUTION_LIMIT = 500;
+const BTC_CONTEXT_SYMBOL = process.env.BTC_CONTEXT_SYMBOL || "BTCUSDC";
+const BTC_CONTEXT_TF = process.env.BTC_CONTEXT_TF || "5m";
+const BTC_CONTEXT_LIMIT = Number(process.env.BTC_CONTEXT_LIMIT || 64);
+const BTC_CONTEXT_CACHE_TTL_MS = Number(process.env.BTC_CONTEXT_CACHE_TTL_MS || 60000);
+
+const btcContextCache = {
+  value: null,
+  fetchedAt: 0,
+  pending: null,
+};
 
 function readJsonSafe(filePath, fallback) {
   return readJsonFileSafe(filePath, fallback);
@@ -82,6 +99,123 @@ function buildMergedConfig(baseConfig, generatedConfig) {
   }
 
   return merged;
+}
+
+async function fetchPublicFuturesKlines(symbol, interval, limit) {
+  const response = await axios.get(`${BINANCE_FUTURES_BASE}/fapi/v1/klines`, {
+    params: {
+      symbol,
+      interval,
+      limit,
+    },
+    timeout: 10000,
+  });
+
+  return (Array.isArray(response.data) ? response.data : []).map((row) => ({
+    openTime: Number(row[0]),
+    open: Number(row[1]),
+    high: Number(row[2]),
+    low: Number(row[3]),
+    close: Number(row[4]),
+    volume: Number(row[5]),
+    closeTime: Number(row[6]),
+  }));
+}
+
+function getEnabledCryptoSymbols(mergedConfig) {
+  return Object.entries(mergedConfig || {})
+    .filter(([symbol, cfg]) => symbol !== "DEFAULTS" && cfg?.ENABLED === true && !isTradFiSymbol(symbol))
+    .map(([symbol]) => String(symbol).toUpperCase())
+    .filter(Boolean);
+}
+
+async function buildBtcContextSnapshot(mergedConfig) {
+  const now = Date.now();
+  if (
+    btcContextCache.value &&
+    now - btcContextCache.fetchedAt < BTC_CONTEXT_CACHE_TTL_MS
+  ) {
+    return btcContextCache.value;
+  }
+
+  if (btcContextCache.pending) {
+    return btcContextCache.pending;
+  }
+
+  const symbols = Array.from(
+    new Set([BTC_CONTEXT_SYMBOL, ...getEnabledCryptoSymbols(mergedConfig)])
+  );
+
+  btcContextCache.pending = (async () => {
+    try {
+      const settled = await Promise.allSettled(
+        symbols.map(async (symbol) => [
+          symbol,
+          await fetchPublicFuturesKlines(symbol, BTC_CONTEXT_TF, BTC_CONTEXT_LIMIT),
+        ])
+      );
+
+      const candlesBySymbol = {};
+      const failedSymbols = [];
+
+      for (const item of settled) {
+        if (item.status === "fulfilled") {
+          const [symbol, candles] = item.value;
+          candlesBySymbol[symbol] = candles;
+        } else {
+          failedSymbols.push(String(item.reason?.symbol || ""));
+        }
+      }
+
+      const snapshot = buildBtcRegimeSnapshot({
+        candlesBySymbol,
+        btcSymbol: BTC_CONTEXT_SYMBOL,
+        timeframe: BTC_CONTEXT_TF,
+        asOf: new Date().toISOString(),
+      });
+
+      snapshot.stale = false;
+      snapshot.failedSymbols = failedSymbols.filter(Boolean);
+
+      btcContextCache.value = snapshot;
+      btcContextCache.fetchedAt = Date.now();
+      return snapshot;
+    } catch (err) {
+      if (btcContextCache.value) {
+        return {
+          ...btcContextCache.value,
+          stale: true,
+          error: err?.message || String(err),
+        };
+      }
+
+      return {
+        state: "unavailable",
+        label: "BTC context unavailable",
+        summary: "Falhou a recolha do contexto BTC.",
+        timeframe: BTC_CONTEXT_TF,
+        btcSymbol: BTC_CONTEXT_SYMBOL,
+        asOf: new Date().toISOString(),
+        stale: true,
+        error: err?.message || String(err),
+        btc: null,
+        alts: {
+          symbols: [],
+          followCount: 0,
+          followRate: 0,
+          positiveBreadth: 0,
+          negativeBreadth: 0,
+          avgReturn1hPct: null,
+          medianReturn1hPct: null,
+          strongestFollower: null,
+        },
+      };
+    } finally {
+      btcContextCache.pending = null;
+    }
+  })();
+
+  return btcContextCache.pending;
 }
 
 function safeAvg(values) {
@@ -961,6 +1095,7 @@ const server = http.createServer(async (req, res) => {
       payload.executionMode = process.env.EXECUTION_MODE || "paper";
       payload.exchange = exchange;
       payload.botStatus = await buildBotStatus();
+      payload.btcContext = await buildBtcContextSnapshot(mergedConfig);
       
       sendJson(req, res, 200, payload);
       return;

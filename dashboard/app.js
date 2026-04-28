@@ -410,6 +410,59 @@ function renderCards(filteredSignals, filteredClosed, filteredExecutions, filter
   renderMetricCards("cards", cards.map((item) => [item[0], item[1], item[2]]));
 }
 
+function btcContextTone(state) {
+  if (state === "risk_off_selloff") return "bad";
+  if (state === "alt_follow_rally") return "good";
+  if (state === "coiled_follow") return "info";
+  if (state === "divergent_rotation") return "warn";
+  return "neutral";
+}
+
+function signedPct(value, digits = 2) {
+  if (typeof value !== "number" || Number.isNaN(value)) return "-";
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${value.toFixed(digits)}%`;
+}
+
+function renderBtcContext(context) {
+  const summaryEl = document.getElementById("btcContextSummary");
+  const cardsEl = document.getElementById("btcContextCards");
+  if (!summaryEl || !cardsEl) return;
+
+  if (!context) {
+    summaryEl.textContent = "Sem contexto BTC disponível.";
+    cardsEl.innerHTML = "";
+    return;
+  }
+
+  const btc = context.btc || {};
+  const alts = context.alts || {};
+  const strongestFollower = alts.strongestFollower
+    ? `${alts.strongestFollower.symbol} ${signedPct(alts.strongestFollower.return1hPct)}`
+    : "-";
+
+  let btcPosture = "-";
+  if (btc.aboveEma20 === true && btc.aboveEma50 === true) btcPosture = "Above EMA20/50";
+  else if (btc.aboveEma20 === false && btc.aboveEma50 === false) btcPosture = "Below EMA20/50";
+  else if (btc.aboveEma20 === true && btc.aboveEma50 === false) btcPosture = "Above 20 / below 50";
+  else if (btc.aboveEma20 === false && btc.aboveEma50 === true) btcPosture = "Below 20 / above 50";
+
+  const summarySuffix = context.stale ? " | snapshot stale" : "";
+  summaryEl.textContent = `${context.summary || context.label || "Sem resumo"}${summarySuffix}`;
+
+  renderMetricCards("btcContextCards", [
+    ["Regime", context.label || "-", btcContextTone(context.state)],
+    ["BTC 1h", signedPct(btc.return1hPct), typeof btc.return1hPct === "number" ? (btc.return1hPct >= 0 ? "good" : "bad") : "neutral"],
+    ["BTC 4h", signedPct(btc.return4hPct), typeof btc.return4hPct === "number" ? (btc.return4hPct >= 0 ? "good" : "bad") : "neutral"],
+    ["BTC Posture", btcPosture, btcContextTone(context.state)],
+    ["Alt Follow", pct01(alts.followRate || 0), alts.followRate >= 0.6 ? "good" : alts.followRate < 0.4 ? "warn" : "neutral"],
+    ["Negative Breadth", pct01(alts.negativeBreadth || 0), (alts.negativeBreadth || 0) >= 0.6 ? "bad" : "neutral"],
+    ["Positive Breadth", pct01(alts.positiveBreadth || 0), (alts.positiveBreadth || 0) >= 0.6 ? "good" : "neutral"],
+    ["Strongest Follower", strongestFollower, "info"],
+    ["Tracked Alts", alts.symbols?.length || 0, "info"],
+  ]);
+}
+
 function renderExchangeReality(exchange, executionMode) {
   const container = document.getElementById("exchangeCards");
   if (!container) return;
@@ -1491,6 +1544,7 @@ function applyFiltersAndRender() {
   const filteredOpenSignals = filterItems(openSignals, filters);
 
   renderCards(filteredSignals, filteredClosed, filteredExecutions, filteredOpenSignals);
+  renderBtcContext(dashboardData.btcContext);
   renderDecisionBoard(filteredSignals, filteredClosed, filteredExecutions);
   renderLiveFocus(filteredOpenSignals, filteredExecutions);
   renderPerformance(dashboardData.performance);

@@ -6,7 +6,7 @@ const axios = require("axios");
 const futuresExecutor = require("./futures-executor");
 const { loadRuntimeConfig } = require("./config/load-runtime-config");
 const { readJsonSafe, writeJsonAtomic } = require("./file-utils");
-const { isLiveSymbolAllowed, isTradFiSymbol } = require("./symbol-universe");
+const { isLiveSymbolAllowed } = require("./symbol-universe");
 const {
   calcEMA,
   calcRSISeries,
@@ -27,8 +27,6 @@ const { evaluateMetaModelCandidate } = require("./meta-model-filter");
 const {
   rankExecutionCandidates,
 } = require("./continuation-ranker");
-const { buildBtcRegimeSnapshot } = require("./btc-regime-context");
-const { passesBtcContextGate, normalizeGateStates } = require("./btc-context-gate");
 const {
   resolveExternalHistoryProvider,
   fetchKlinesFromExternalProvider,
@@ -128,11 +126,6 @@ function toPositiveNumber(value) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-function toPositiveInteger(value) {
-  const n = Math.floor(Number(value));
-  return Number.isFinite(n) && n > 0 ? n : null;
-}
-
 function getStrategyExecutionOverrides(cfg = {}, strategyName) {
   const strategyKey = STRATEGY_CONFIG_KEY_BY_NAME[strategyName] || null;
   const strategyCfg =
@@ -152,67 +145,6 @@ function getStrategyExecutionOverrides(cfg = {}, strategyName) {
     maxPositionUsd: toPositiveNumber(
       executionCfg.maxPositionUsd ?? strategyCfg.maxPositionUsd
     ),
-    maxPortfolioNotionalUsd: toPositiveNumber(
-      executionCfg.maxPortfolioNotionalUsd ??
-        strategyCfg.maxPortfolioNotionalUsd
-    ),
-    maxSideNotionalUsd: toPositiveNumber(
-      executionCfg.maxSideNotionalUsd ?? strategyCfg.maxSideNotionalUsd
-    ),
-    maxPortfolioRiskUsd: toPositiveNumber(
-      executionCfg.maxPortfolioRiskUsd ?? strategyCfg.maxPortfolioRiskUsd
-    ),
-    maxSideRiskUsd: toPositiveNumber(
-      executionCfg.maxSideRiskUsd ?? strategyCfg.maxSideRiskUsd
-    ),
-    maxRollingNetLossUsd: toPositiveNumber(
-      executionCfg.maxRollingNetLossUsd ?? strategyCfg.maxRollingNetLossUsd
-    ),
-    rollingLossLookbackHours: toPositiveInteger(
-      executionCfg.rollingLossLookbackHours ??
-        strategyCfg.rollingLossLookbackHours
-    ),
-    maxConsecutiveLosses: toPositiveInteger(
-      executionCfg.maxConsecutiveLosses ?? strategyCfg.maxConsecutiveLosses
-    ),
-    lossStreakCooldownMins: toPositiveInteger(
-      executionCfg.lossStreakCooldownMins ??
-        strategyCfg.lossStreakCooldownMins
-    ),
-  };
-}
-
-function getStrategyBtcContextGate(cfg = {}, strategyName) {
-  const strategyKey = STRATEGY_CONFIG_KEY_BY_NAME[strategyName] || null;
-  const strategyCfg =
-    strategyKey && isPlainObject(cfg?.[strategyKey]) ? cfg[strategyKey] : {};
-  const gateCfg = isPlainObject(strategyCfg?.BTC_CONTEXT_GATE)
-    ? strategyCfg.BTC_CONTEXT_GATE
-    : {};
-
-  return {
-    enabled: gateCfg.enabled === true,
-    btcSymbol: String(gateCfg.btcSymbol || "BTCUSDC")
-      .trim()
-      .toUpperCase(),
-    timeframe: String(gateCfg.timeframe || cfg?.TF || TF).trim() || TF,
-    limit: Math.max(64, Number(gateCfg.limit || cfg?.LIMIT || LIMIT) || LIMIT),
-    states: normalizeGateStates(gateCfg.states || gateCfg.gateStates, [
-      "risk_off_selloff",
-    ]),
-    minNegativeBreadth: Number.isFinite(Number(gateCfg.minNegativeBreadth))
-      ? Number(gateCfg.minNegativeBreadth)
-      : 0.6,
-    minFollowRate: Number.isFinite(Number(gateCfg.minFollowRate))
-      ? Number(gateCfg.minFollowRate)
-      : 0.6,
-    symbols: Array.isArray(gateCfg.symbols)
-      ? [...new Set(
-          gateCfg.symbols
-            .map((symbol) => String(symbol || "").trim().toUpperCase())
-            .filter(Boolean)
-        )]
-      : [],
   };
 }
 
@@ -780,128 +712,6 @@ async function fetchKlines(symbol, interval, limit) {
   }));
 }
 
-async function fetchCachedKlines(cache, symbol, interval, limit) {
-  if (!cache || typeof cache !== "object") {
-    return fetchKlines(symbol, interval, limit);
-  }
-
-  if (!cache.klines) {
-    cache.klines = new Map();
-  }
-
-  const key = `${String(symbol || "").toUpperCase()}::${interval}::${limit}`;
-  const existing = cache.klines.get(key);
-
-  if (existing?.data) {
-    return existing.data;
-  }
-
-  if (existing?.pending) {
-    return existing.pending;
-  }
-
-  const pending = fetchKlines(symbol, interval, limit)
-    .then((rows) => {
-      cache.klines.set(key, { data: rows });
-      return rows;
-    })
-    .catch((err) => {
-      cache.klines.delete(key);
-      throw err;
-    });
-
-  cache.klines.set(key, { pending });
-  return pending;
-}
-
-function sliceCandlesThroughCloseTime(candles, closeTime) {
-  const rows = Array.isArray(candles) ? candles : [];
-  const targetCloseTime = Number(closeTime);
-  if (!Number.isFinite(targetCloseTime) || targetCloseTime <= 0) return rows;
-
-  let endIndex = 0;
-  while (
-    endIndex < rows.length &&
-    Number(rows[endIndex]?.closeTime) <= targetCloseTime
-  ) {
-    endIndex += 1;
-  }
-
-  return rows.slice(0, endIndex);
-}
-
-async function evaluateBtcContextGateForSignal({
-  cfg,
-  strategyName,
-  signalCandleCloseTime,
-  symbolTf,
-  marketDataCache,
-  enabledCryptoSymbols,
-}) {
-  const gate = getStrategyBtcContextGate(cfg, strategyName);
-  if (!gate.enabled) {
-    return {
-      applied: false,
-      passed: true,
-      reason: "btc_gate_not_requested",
-      snapshot: null,
-    };
-  }
-
-  const gateSymbols = Array.from(
-    new Set(
-      (gate.symbols.length ? gate.symbols : enabledCryptoSymbols || [])
-        .map((symbol) => String(symbol || "").trim().toUpperCase())
-        .filter((symbol) => symbol && symbol !== gate.btcSymbol)
-    )
-  );
-
-  const symbolsToFetch = [gate.btcSymbol, ...gateSymbols];
-  const candlesBySymbol = {};
-
-  for (const symbol of symbolsToFetch) {
-    const rows = await fetchCachedKlines(
-      marketDataCache,
-      symbol,
-      gate.timeframe || symbolTf,
-      gate.limit
-    );
-    const usableRows = sliceCandlesThroughCloseTime(rows, signalCandleCloseTime);
-    if (!Array.isArray(usableRows) || usableRows.length < 30) {
-      return {
-        applied: true,
-        passed: false,
-        reason: `btc_gate:insufficient_candles_${symbol}`,
-        snapshot: null,
-      };
-    }
-    candlesBySymbol[symbol] = usableRows;
-  }
-
-  const snapshot = buildBtcRegimeSnapshot({
-    candlesBySymbol,
-    btcSymbol: gate.btcSymbol,
-    timeframe: gate.timeframe || symbolTf,
-    asOf: Number.isFinite(Number(signalCandleCloseTime))
-      ? new Date(Number(signalCandleCloseTime)).toISOString()
-      : new Date().toISOString(),
-  });
-
-  const decision = passesBtcContextGate(snapshot, {
-    states: gate.states,
-    minNegativeBreadth: gate.minNegativeBreadth,
-    minFollowRate: gate.minFollowRate,
-    btcDirection: "down",
-  });
-
-  return {
-    applied: true,
-    passed: decision.allowed,
-    reason: decision.reason,
-    snapshot,
-  };
-}
-
 function findOpenExecutionForSignal(state, signal) {
   const executions = Array.isArray(state?.executions) ? state.executions : [];
 
@@ -1269,56 +1079,6 @@ async function executePreparedSignal(candidate, state) {
     ...(Number.isFinite(Number(executionOverrides?.maxPositionUsd))
       ? { maxPositionUsd: Number(executionOverrides.maxPositionUsd) }
       : {}),
-    ...(Number.isFinite(Number(executionOverrides?.maxPortfolioNotionalUsd))
-      ? {
-          maxPortfolioNotionalUsd: Number(
-            executionOverrides.maxPortfolioNotionalUsd
-          ),
-        }
-      : {}),
-    ...(Number.isFinite(Number(executionOverrides?.maxSideNotionalUsd))
-      ? {
-          maxSideNotionalUsd: Number(
-            executionOverrides.maxSideNotionalUsd
-          ),
-        }
-      : {}),
-    ...(Number.isFinite(Number(executionOverrides?.maxPortfolioRiskUsd))
-      ? {
-          maxPortfolioRiskUsd: Number(executionOverrides.maxPortfolioRiskUsd),
-        }
-      : {}),
-    ...(Number.isFinite(Number(executionOverrides?.maxSideRiskUsd))
-      ? { maxSideRiskUsd: Number(executionOverrides.maxSideRiskUsd) }
-      : {}),
-    ...(Number.isFinite(Number(executionOverrides?.maxRollingNetLossUsd))
-      ? {
-          maxRollingNetLossUsd: Number(
-            executionOverrides.maxRollingNetLossUsd
-          ),
-        }
-      : {}),
-    ...(Number.isFinite(Number(executionOverrides?.rollingLossLookbackHours))
-      ? {
-          rollingLossLookbackHours: Number(
-            executionOverrides.rollingLossLookbackHours
-          ),
-        }
-      : {}),
-    ...(Number.isFinite(Number(executionOverrides?.maxConsecutiveLosses))
-      ? {
-          maxConsecutiveLosses: Number(
-            executionOverrides.maxConsecutiveLosses
-          ),
-        }
-      : {}),
-    ...(Number.isFinite(Number(executionOverrides?.lossStreakCooldownMins))
-      ? {
-          lossStreakCooldownMins: Number(
-            executionOverrides.lossStreakCooldownMins
-          ),
-        }
-      : {}),
   });
 
   if (execResult.executed) {
@@ -1381,11 +1141,7 @@ async function executePreparedSignal(candidate, state) {
 // Core per symbol
 // =========================
 
-async function processSymbol(
-  symbolInput,
-  state,
-  { marketDataCache = null, enabledCryptoSymbols = [] } = {}
-) {
+async function processSymbol(symbolInput, state) {
   const run =
     typeof symbolInput === "string" ? { symbol: symbolInput } : symbolInput || {};
   const symbol = String(run.symbol || symbolInput || "");
@@ -1408,18 +1164,8 @@ async function processSymbol(
     `[CORE] ${runLabel} TF=${symbolTf} limit=${symbolLimit} HTF=${symbolHtfTf} (futures-ready)`
   );
 
-  const candles = await fetchCachedKlines(
-    marketDataCache,
-    symbol,
-    symbolTf,
-    symbolLimit
-  );
-  const htfCandles = await fetchCachedKlines(
-    marketDataCache,
-    symbol,
-    symbolHtfTf,
-    symbolHtfLimit
-  );
+  const candles = await fetchKlines(symbol, symbolTf, symbolLimit);
+  const htfCandles = await fetchKlines(symbol, symbolHtfTf, symbolHtfLimit);
 
   if (!candles || candles.length < 220) {
     console.log(`[CORE] ${symbol} candles insuficientes.`);
@@ -1962,26 +1708,6 @@ async function processSymbol(
     executionBucket: executionOverrides.executionBucket,
     executionRiskPerTrade: executionOverrides.riskPerTrade,
     executionMaxPositionUsd: executionOverrides.maxPositionUsd,
-    executionMaxPortfolioNotionalUsd:
-      executionOverrides.maxPortfolioNotionalUsd,
-    executionMaxSideNotionalUsd: executionOverrides.maxSideNotionalUsd,
-    executionMaxPortfolioRiskUsd: executionOverrides.maxPortfolioRiskUsd,
-    executionMaxSideRiskUsd: executionOverrides.maxSideRiskUsd,
-    executionMaxRollingNetLossUsd:
-      executionOverrides.maxRollingNetLossUsd,
-    executionRollingLossLookbackHours:
-      executionOverrides.rollingLossLookbackHours,
-    executionMaxConsecutiveLosses:
-      executionOverrides.maxConsecutiveLosses,
-    executionLossStreakCooldownMins:
-      executionOverrides.lossStreakCooldownMins,
-    btcContextGateApplied: false,
-    btcContextGatePassed: true,
-    btcContextGateReason: "btc_gate_not_requested",
-    btcContextState: null,
-    btcContextFollowRate: null,
-    btcContextNegativeBreadth: null,
-    btcContextSummary: null,
     avgVol,
     strategyCandidates,
   });
@@ -2126,76 +1852,7 @@ async function processSymbol(
     executionBucket: executionOverrides.executionBucket,
     executionRiskPerTrade: executionOverrides.riskPerTrade,
     executionMaxPositionUsd: executionOverrides.maxPositionUsd,
-    executionMaxPortfolioNotionalUsd:
-      executionOverrides.maxPortfolioNotionalUsd,
-    executionMaxSideNotionalUsd: executionOverrides.maxSideNotionalUsd,
-    executionMaxPortfolioRiskUsd: executionOverrides.maxPortfolioRiskUsd,
-    executionMaxSideRiskUsd: executionOverrides.maxSideRiskUsd,
-    executionMaxRollingNetLossUsd:
-      executionOverrides.maxRollingNetLossUsd,
-    executionRollingLossLookbackHours:
-      executionOverrides.rollingLossLookbackHours,
-    executionMaxConsecutiveLosses:
-      executionOverrides.maxConsecutiveLosses,
-    executionLossStreakCooldownMins:
-      executionOverrides.lossStreakCooldownMins,
   };
-
-  const btcContextDecision = await evaluateBtcContextGateForSignal({
-    cfg,
-    strategyName: selectedStrategy,
-    signalCandleCloseTime: last.closeTime,
-    symbolTf,
-    marketDataCache,
-    enabledCryptoSymbols,
-  });
-
-  signalObj.btcContextGateApplied = btcContextDecision.applied === true;
-  signalObj.btcContextGatePassed = btcContextDecision.passed === true;
-  signalObj.btcContextGateReason = btcContextDecision.reason || null;
-  signalObj.btcContextState = btcContextDecision.snapshot?.state || null;
-  signalObj.btcContextFollowRate = Number.isFinite(
-    Number(btcContextDecision.snapshot?.alts?.followRate)
-  )
-    ? Number(btcContextDecision.snapshot.alts.followRate)
-    : null;
-  signalObj.btcContextNegativeBreadth = Number.isFinite(
-    Number(btcContextDecision.snapshot?.alts?.negativeBreadth)
-  )
-    ? Number(btcContextDecision.snapshot.alts.negativeBreadth)
-    : null;
-  signalObj.btcContextSummary = btcContextDecision.snapshot?.summary || null;
-
-  if (lastSignalLogEntry) {
-    lastSignalLogEntry.btcContextGateApplied = signalObj.btcContextGateApplied;
-    lastSignalLogEntry.btcContextGatePassed = signalObj.btcContextGatePassed;
-    lastSignalLogEntry.btcContextGateReason = signalObj.btcContextGateReason;
-    lastSignalLogEntry.btcContextState = signalObj.btcContextState;
-    lastSignalLogEntry.btcContextFollowRate = signalObj.btcContextFollowRate;
-    lastSignalLogEntry.btcContextNegativeBreadth =
-      signalObj.btcContextNegativeBreadth;
-    lastSignalLogEntry.btcContextSummary = signalObj.btcContextSummary;
-  }
-
-  if (signalObj.btcContextGateApplied && !signalObj.btcContextGatePassed) {
-    console.log(
-      `[BTC_GATE] ${symbol} ${selectedStrategy} rejected state=${
-        signalObj.btcContextState || "unknown"
-      } follow=${round(Number(signalObj.btcContextFollowRate || 0), 4)} ` +
-        `negativeBreadth=${round(
-          Number(signalObj.btcContextNegativeBreadth || 0),
-          4
-        )} reason=${signalObj.btcContextGateReason}`
-    );
-
-    if (lastSignalLogEntry) {
-      lastSignalLogEntry.decisionReason = `btc_context_rejected:${signalObj.btcContextGateReason}`;
-    }
-
-    markCurrentClosedCandleProcessed();
-    saveState(state);
-    return;
-  }
 
   if (!shouldSendSignal(state, signalObj, symbolCooldownMins)) {
     console.log(`[CORE] ${symbol} sinal repetido/cooldown — ignorado.`);
@@ -2307,14 +1964,6 @@ async function processSymbol(
 async function main() {
   const state = loadState();
   const enabledRuns = getEnabledSymbolRuns();
-  const enabledCryptoSymbols = Array.from(
-    new Set(
-      enabledRuns
-        .map((run) => String(run.symbol || "").trim().toUpperCase())
-        .filter((symbol) => symbol && !isTradFiSymbol(symbol))
-    )
-  );
-  const marketDataCache = { klines: new Map() };
   const preparedCandidates = [];
 
   console.log(
@@ -2323,10 +1972,7 @@ async function main() {
 
   for (const run of enabledRuns) {
     try {
-      const result = await processSymbol(run, state, {
-        marketDataCache,
-        enabledCryptoSymbols,
-      });
+      const result = await processSymbol(run, state);
       if (result?.candidate) {
         preparedCandidates.push(result.candidate);
       }

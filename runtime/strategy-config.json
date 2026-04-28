@@ -292,7 +292,19 @@
     },
     "CIPHER_CONTINUATION_LONG": {
       "enabled": true,
-      "ema200BufferPct": 0.006
+      "ema200BufferPct": 0.006,
+      "preMacdStructureOverride": {
+        "enabled": true,
+        "minRr": 0.6,
+        "minAdx": 8,
+        "minRsi": 49,
+        "maxExtensionAtr": 0.1,
+        "maxSignalVolRatio": 0.9,
+        "requireBullishStack": true,
+        "requirePullbackTouchesEma20": true,
+        "requirePullbackNearBbBasis": true,
+        "requirePullbackStaysAboveEma50": true
+      }
     },
     "TREND": {
       "enabled": false,

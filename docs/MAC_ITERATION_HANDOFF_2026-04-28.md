@@ -15,6 +15,8 @@ Objetivo: por a iteracao do Mac a par do estado real de GitHub, servidor e direc
 - O proximo grande passo deve ser:
   - mergear o codigo mais avancado do Mac sobre esta base limpa e alinhada
   - preparar a migracao da persistencia para uma base de dados central, idealmente PostgreSQL
+- O `torus-pr1-snapshot` deste workspace contem uma linha mais avancada de codigo, mas nao deve ser confundido com a verdade live que estava validada no servidor.
+- A afinacao mais recente em estudo e uma relaxacao estreita de `cipherContinuationLong:macd_not_reaccelerating` apenas para `ADAUSDC`, nunca uma abertura geral do gate.
 
 ## 2. Estado Atual: GitHub, Servidor e Live
 
@@ -66,7 +68,7 @@ No momento em que este handoff foi preparado, o servidor live ja estava alinhado
   - `openSignals=0`
   - `closedSignals=293`
   - `executions=293`
-  - `btcContextState=mixed`
+  - `cbtcontextState=mixed`
 
 Observacao importante:
 - o dashboard teve de ser reiniciado separadamente depois do cutover
@@ -112,6 +114,10 @@ Foi sincronizado para o GitHub o estado live testado que faltava subir. Os fiche
 - `runtime/dashboard-server.js`
 - `runtime/torus-ai-trading.js`
 
+Artefacto local do patch final:
+
+- [final-server-sync-9653eb0.patch](C:\Users\joborocha\Documents\Codex\2026-04-28\procura-instancias-tuas-a-correr-em\final-server-sync-9653eb0.patch)
+
 ### 3.3. Cutover limpo no servidor
 
 O live foi depois alinhado com o branch limpo, preservando estado operacional.
@@ -142,13 +148,10 @@ Estes sao os backups que devem ser tratados como referencia de rollback imediato
 
 ### Artefactos da analise
 
-A analise de equilibrio foi corrida hoje contra o checkout live do servidor, nao apenas contra um snapshot local.
+- [balance-equilibrium-analysis.js](C:\Users\joborocha\Documents\Codex\2026-04-28\procura-instancias-tuas-a-correr-em\balance-equilibrium-analysis.js)
+- [balance-equilibrium-report-live.json](C:\Users\joborocha\Documents\Codex\2026-04-28\procura-instancias-tuas-a-correr-em\balance-equilibrium-report-live.json)
 
-Para detalhes, ver tambem os pontos relevantes no codigo e docs existentes:
-
-- `runtime/strategy-config.json`
-- `strategies/`
-- `docs/AGENT_CONTEXT.md`
+Esta analise foi corrida contra o checkout live do servidor, nao apenas contra um snapshot local.
 
 ### Universo analisado
 
@@ -257,6 +260,84 @@ Leitura sobre `1000SHIBUSDC short`:
   - `PF 0.642`
   - `avgNetPnlPct -0.1626`
 
+### Update tardio: analise do gate `macd_not_reaccelerating`
+
+Depois da analise de equilibrio geral, foi feita uma auditoria mais fina sobre os sinais bloqueados da lane principal usando:
+
+- `server-live-state-2026-04-28.json`
+- `server-live-strategy-config-2026-04-28.json`
+- `today-signal-audit.js`
+- `today-signal-audit-details-2026-04-28.json`
+
+Observacao metodologica importante:
+
+- a auditoria parte do estado live capturado do servidor
+- mas o `torus-pr1-snapshot` local inclui codigo mais avancado do que o branch/live efetivamente validados
+- por isso, qualquer tune novo deve ser aplicado sobre a base live/branch estrita, nao sobre o snapshot avancado
+
+#### Resultado do filtro na lane principal
+
+Dentro dos bloqueados `EXECUTABLE` resolvidos da lane principal, o filtro `cipherContinuationLong:macd_not_reaccelerating` apanhou:
+
+- `49` casos no total
+- `ADAUSDC`: `28`
+  - `17` `tp_before_sl`
+  - `6` `sl_before_tp`
+  - `3` `timeout_negative`
+  - `1` `timeout_positive`
+  - `1` `timeout_flat`
+- `LINKUSDC`: `21`
+  - `4` `tp_before_sl`
+  - `12` `sl_before_tp`
+  - `4` `timeout_negative`
+  - `1` `timeout_flat`
+
+Leitura:
+
+- `ADAUSDC` tem falsos negativos reais neste gate
+- `LINKUSDC` nao justifica uma abertura equivalente
+- portanto, qualquer relaxacao aqui deve ser:
+  - simbolo-especifica
+  - estreita
+  - e rastreavel nos logs
+
+#### Tune recomendado
+
+O tune preparado para esta iteracao e:
+
+- novo caminho `selected_premacd_structure` em `strategies/cipher-continuation-long-strategy.js`
+- ativo apenas em `ADAUSDC` dentro de `runtime/strategy-config.json`
+- com requisitos cumulativos de estrutura:
+  - `bullishBias`
+  - `aboveEma50`
+  - `bullishStack`
+  - `pullbackTouchesEma20`
+  - `pullbackNearBbBasis`
+  - `pullbackStaysAboveEma50`
+  - `extensionAtr <= 0.1`
+  - `signalVolRatio <= 0.9`
+  - `rsi >= 49`
+  - `adx >= 8`
+  - `plannedRr >= 0.6`
+
+Na amostra de hoje, este recorte teria selecionado:
+
+- `3` sinais `ADAUSDC`
+- `3/3` com `tp_before_sl`
+- soma de `planned R = 2.9277`
+- soma de `labelRealizedPnlPct = +0.6702%`
+
+Artefactos tecnicos preparados para este tune:
+
+- `strategies/cipher-continuation-long-strategy.js`
+- `runtime/strategy-config.json`
+- `tests/cipher-continuation-long-premacd-override.test.js`
+
+Nota de estado:
+
+- este tune deve ser tratado como uma afinacao incremental da base live estrita
+- nao implica adotar em bloco os caminhos `early` do snapshot mais avancado
+
 ## 6. Onde a Iteracao do Mac Deve Entrar
 
 Premissa importante:
@@ -317,8 +398,8 @@ Hoje, a persistencia esta dividida entre JSON e SQLite.
 
 Exemplos relevantes no codigo:
 
-- `runtime/sqlite-store.js`
-- `runtime/file-utils.js`
+- [sqlite-store.js](C:\Users\joborocha\Documents\Codex\2026-04-28\procura-instancias-tuas-a-correr-em\torus-pr1-snapshot\runtime\sqlite-store.js)
+- [file-utils.js](C:\Users\joborocha\Documents\Codex\2026-04-28\procura-instancias-tuas-a-correr-em\torus-pr1-snapshot\runtime\file-utils.js)
 
 O espelho SQLite atual usa WAL e serve bem como etapa transitoria, mas nao deve ser o destino final como source of truth principal.
 
@@ -413,22 +494,12 @@ Quando a iteracao do Mac pegar neste contexto, a ordem recomendada e:
 5. desenhar a nova camada de persistencia com PostgreSQL como alvo
 6. so depois disso mexer mais a serio no motor autonomo de selecao/promocao de estrategias
 
-## 11. Artefactos e Contexto Auxiliar
+## 11. Artefactos Locais Que Ajudam Neste Handoff
 
-No repo:
-
-- `docs/AGENT_CONTEXT.md`
-- `docs/HETZNER_DEPLOYMENT.md`
-- `docs/SKILL_SIGNALS_BOT_LAB.md`
-- `docs/SKILL_SIGNALS_BOT_OPERATOR.md`
-
-Fora do repo, no workspace local desta iteracao, existem ainda artefactos uteis que nao foram publicados:
-
-- `balance-equilibrium-analysis.js`
-- `balance-equilibrium-report-live.json`
-- `final-server-sync-9653eb0.patch`
-
-Se esses ficheiros forem precisos no Mac, convem pedi-los explicitamente a esta iteracao ou copi-los do workspace de origem.
+- [balance-equilibrium-analysis.js](C:\Users\joborocha\Documents\Codex\2026-04-28\procura-instancias-tuas-a-correr-em\balance-equilibrium-analysis.js)
+- [balance-equilibrium-report-live.json](C:\Users\joborocha\Documents\Codex\2026-04-28\procura-instancias-tuas-a-correr-em\balance-equilibrium-report-live.json)
+- [final-server-sync-9653eb0.patch](C:\Users\joborocha\Documents\Codex\2026-04-28\procura-instancias-tuas-a-correr-em\final-server-sync-9653eb0.patch)
+- [AGENT_CONTEXT.md](C:\Users\joborocha\Documents\Codex\2026-04-28\procura-instancias-tuas-a-correr-em\AGENT_CONTEXT.md)
 
 ## 12. Nota Final
 

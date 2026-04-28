@@ -67,6 +67,34 @@ function evaluateCipherContinuationLongStrategy(ctx) {
       cfg.MIN_TP_PCT_AFTER_CAP ??
       0.0012
   );
+  const preMacdStructureOverrideCfg =
+    cipherCfg.preMacdStructureOverride || {};
+  const preMacdStructureOverrideEnabled =
+    preMacdStructureOverrideCfg.enabled === true;
+  const preMacdStructureOverrideMinRr = Number(
+    preMacdStructureOverrideCfg.minRr ?? Math.max(minPlannedRr, 0.8)
+  );
+  const preMacdStructureOverrideMinAdx = Number(
+    preMacdStructureOverrideCfg.minAdx ?? minAdx
+  );
+  const preMacdStructureOverrideMinRsi = Number(
+    preMacdStructureOverrideCfg.minRsi ?? 0
+  );
+  const preMacdStructureOverrideMaxExtensionAtr = Number(
+    preMacdStructureOverrideCfg.maxExtensionAtr ??
+      Math.min(maxExtensionAtr, 0.25)
+  );
+  const preMacdStructureOverrideMaxSignalVolRatio = Number(
+    preMacdStructureOverrideCfg.maxSignalVolRatio ?? maxSignalVolRatio
+  );
+  const preMacdStructureOverrideRequireBullishStack =
+    preMacdStructureOverrideCfg.requireBullishStack === true;
+  const preMacdStructureOverrideRequirePullbackTouchesEma20 =
+    preMacdStructureOverrideCfg.requirePullbackTouchesEma20 === true;
+  const preMacdStructureOverrideRequirePullbackNearBbBasis =
+    preMacdStructureOverrideCfg.requirePullbackNearBbBasis === true;
+  const preMacdStructureOverrideRequirePullbackStaysAboveEma50 =
+    preMacdStructureOverrideCfg.requirePullbackStaysAboveEma50 !== false;
 
   if (!enabled || !Array.isArray(candles) || candles.length < 60) {
     return {
@@ -129,6 +157,7 @@ function evaluateCipherContinuationLongStrategy(ctx) {
   const ema50 = Number(indicators.ema50 || 0);
   const ema200 = Number(indicators.ema200 || 0);
   const adx = Number(indicators.adx || 0);
+  const rsi = Number(indicators.rsi || 0);
   const ema20AboveEma50 = ema20 > ema50;
   const bullishStack = ema20 > ema50 && ema50 > ema200;
   const aboveEma50 = entry > ema50;
@@ -218,6 +247,47 @@ function evaluateCipherContinuationLongStrategy(ctx) {
   const plannedRr = helpers.safeRatio(reward, risk);
   const tpPctAfterCap = entry > 0 ? reward / entry : null;
   const validRiskShape = hasValidLongRiskShape(entry, sl, tp);
+  const preMacdStructureOverridePullbackZoneOk =
+    pullbackTouchesEma20 || pullbackNearBbBasis;
+  const preMacdStructureOverrideSignalVolRatioOk =
+    Number.isFinite(signalVolRatio) &&
+    signalVolRatio <= preMacdStructureOverrideMaxSignalVolRatio;
+  const preMacdStructureOverrideExtensionOk =
+    Number.isFinite(extensionAtr) &&
+    extensionAtr <= preMacdStructureOverrideMaxExtensionAtr;
+  const preMacdStructureOverrideRsiOk =
+    Number.isFinite(rsi) && rsi >= preMacdStructureOverrideMinRsi;
+  const preMacdStructureOverrideBullishStackOk =
+    !preMacdStructureOverrideRequireBullishStack || bullishStack;
+  const preMacdStructureOverrideTouchesEma20Ok =
+    !preMacdStructureOverrideRequirePullbackTouchesEma20 ||
+    pullbackTouchesEma20;
+  const preMacdStructureOverrideNearBbBasisOk =
+    !preMacdStructureOverrideRequirePullbackNearBbBasis ||
+    pullbackNearBbBasis;
+  const preMacdStructureOverridePullbackDepthOk =
+    !preMacdStructureOverrideRequirePullbackStaysAboveEma50 ||
+    pullbackStaysAboveEma50;
+  const preMacdStructureOverrideAllowed =
+    preMacdStructureOverrideEnabled &&
+    !macdReaccelerating &&
+    bullishBias &&
+    aboveEma50 &&
+    notTooExtended &&
+    bullishSignal &&
+    adx >= preMacdStructureOverrideMinAdx &&
+    validRiskShape &&
+    signalClass === "EXECUTABLE" &&
+    Number.isFinite(plannedRr) &&
+    plannedRr >= preMacdStructureOverrideMinRr &&
+    preMacdStructureOverridePullbackZoneOk &&
+    preMacdStructureOverrideSignalVolRatioOk &&
+    preMacdStructureOverrideExtensionOk &&
+    preMacdStructureOverrideRsiOk &&
+    preMacdStructureOverrideBullishStackOk &&
+    preMacdStructureOverrideTouchesEma20Ok &&
+    preMacdStructureOverrideNearBbBasisOk &&
+    preMacdStructureOverridePullbackDepthOk;
 
   const allowed =
     bullishBias &&
@@ -232,8 +302,9 @@ function evaluateCipherContinuationLongStrategy(ctx) {
     signalClass === "EXECUTABLE" &&
     Number.isFinite(plannedRr) &&
     plannedRr >= minPlannedRr;
+  const finalAllowed = allowed || preMacdStructureOverrideAllowed;
 
-  if (!allowed) {
+  if (!finalAllowed) {
     let reason = "cipherContinuationLong:rules_not_met";
 
     if (!bullishBias) reason = "cipherContinuationLong:bullish_bias_missing";
@@ -280,12 +351,28 @@ function evaluateCipherContinuationLongStrategy(ctx) {
         pullbackStaysAboveEma50,
         macdHist: macdNow.hist,
         prevMacdHist: macdPrev.hist,
+        rsi,
         macdReaccelerating,
         bbBasis: bb.basis,
         bbLower: bb.lower,
         signalVolRatio,
         plannedRr,
         validRiskShape,
+        preMacdStructureOverrideEnabled,
+        preMacdStructureOverrideAllowed,
+        preMacdStructureOverrideMinRr,
+        preMacdStructureOverrideMinAdx,
+        preMacdStructureOverrideMinRsi,
+        preMacdStructureOverrideMaxExtensionAtr,
+        preMacdStructureOverrideMaxSignalVolRatio,
+        preMacdStructureOverridePullbackZoneOk,
+        preMacdStructureOverrideSignalVolRatioOk,
+        preMacdStructureOverrideExtensionOk,
+        preMacdStructureOverrideRsiOk,
+        preMacdStructureOverrideBullishStackOk,
+        preMacdStructureOverrideTouchesEma20Ok,
+        preMacdStructureOverrideNearBbBasisOk,
+        preMacdStructureOverridePullbackDepthOk,
       },
     };
   }
@@ -317,6 +404,7 @@ function evaluateCipherContinuationLongStrategy(ctx) {
         pullbackStaysAboveEma50,
         macdHist: macdNow.hist,
         prevMacdHist: macdPrev.hist,
+        rsi,
         macdReaccelerating,
         bbBasis: bb.basis,
         bbLower: bb.lower,
@@ -324,6 +412,8 @@ function evaluateCipherContinuationLongStrategy(ctx) {
         plannedRr,
         tpPctAfterCap,
         validRiskShape,
+        preMacdStructureOverrideEnabled,
+        preMacdStructureOverrideAllowed,
       },
     };
   }
@@ -355,6 +445,7 @@ function evaluateCipherContinuationLongStrategy(ctx) {
         pullbackStaysAboveEma50,
         macdHist: macdNow.hist,
         prevMacdHist: macdPrev.hist,
+        rsi,
         macdReaccelerating,
         bbBasis: bb.basis,
         bbLower: bb.lower,
@@ -362,6 +453,8 @@ function evaluateCipherContinuationLongStrategy(ctx) {
         plannedRr,
         tpPctAfterCap,
         validRiskShape,
+        preMacdStructureOverrideEnabled,
+        preMacdStructureOverrideAllowed,
       },
     };
   }
@@ -378,7 +471,9 @@ function evaluateCipherContinuationLongStrategy(ctx) {
     tp,
     rawTp,
     tpCappedByResistance,
-    reason: "selected",
+    reason: preMacdStructureOverrideAllowed
+      ? "selected_premacd_structure"
+      : "selected",
     meta: {
       trendMode,
       bullishBias,
@@ -394,6 +489,7 @@ function evaluateCipherContinuationLongStrategy(ctx) {
       pullbackStaysAboveEma50,
       macdHist: macdNow.hist,
       prevMacdHist: macdPrev.hist,
+      rsi,
       macdReaccelerating,
       bbBasis: bb.basis,
       bbLower: bb.lower,
@@ -401,6 +497,21 @@ function evaluateCipherContinuationLongStrategy(ctx) {
       plannedRr,
       tpPctAfterCap,
       validRiskShape,
+      preMacdStructureOverrideEnabled,
+      preMacdStructureOverrideAllowed,
+      preMacdStructureOverrideMinRr,
+      preMacdStructureOverrideMinAdx,
+      preMacdStructureOverrideMinRsi,
+      preMacdStructureOverrideMaxExtensionAtr,
+      preMacdStructureOverrideMaxSignalVolRatio,
+      preMacdStructureOverridePullbackZoneOk,
+      preMacdStructureOverrideSignalVolRatioOk,
+      preMacdStructureOverrideExtensionOk,
+      preMacdStructureOverrideRsiOk,
+      preMacdStructureOverrideBullishStackOk,
+      preMacdStructureOverrideTouchesEma20Ok,
+      preMacdStructureOverrideNearBbBasisOk,
+      preMacdStructureOverridePullbackDepthOk,
     },
   };
 }

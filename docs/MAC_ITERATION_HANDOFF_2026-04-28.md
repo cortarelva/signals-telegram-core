@@ -7,7 +7,7 @@ Objetivo: por a iteracao do Mac a par do estado real de GitHub, servidor e direc
 
 - O repositorio de referencia e `cortarelva/TorusAiTrading`.
 - O branch de trabalho que concentrou a sync util e `codex/repo-sync-cleanup`.
-- O head atual desse branch, ja sincronizado no GitHub, e `3bad415d950aed9dd2826f8c810337492eeea1a1`.
+- O head atual desse branch deve ser consultado diretamente no PR #1 no momento do merge, porque a branch continuou a receber syncs pequenas de docs e handoff.
 - O PR correspondente e o draft PR #1:
   - [PR #1](https://github.com/cortarelva/TorusAiTrading/pull/1)
 - O ultimo estado live confirmado no servidor continua a ser `9653eb0c0e8b5cde836fbaa4449aa8e18b1b1d13`.
@@ -26,11 +26,11 @@ Objetivo: por a iteracao do Mac a par do estado real de GitHub, servidor e direc
 
 - Repositorio: `cortarelva/TorusAiTrading`
 - Branch principal de trabalho: `codex/repo-sync-cleanup`
-- Commit de referencia atual:
-  - `3bad415d950aed9dd2826f8c810337492eeea1a1`
+- Head atual do branch:
+  - consultar o PR #1 no momento do merge/rebase
 - O commit `9653eb0c0e8b5cde836fbaa4449aa8e18b1b1d13` continua a ser a ultima reconciliacao live testada e puxada para o servidor.
 - O commit `cd940aa36d27c028af46d015f14e53422c8f120d` acrescentou a afinacao estreita de `macd_not_reaccelerating` para `ADAUSDC`.
-- O branch continuou depois disso a evoluir ate `3bad415d950aed9dd2826f8c810337492eeea1a1`.
+- O branch continuou depois disso a evoluir com novas syncs de docs e handoff.
 
 ### Servidor
 
@@ -48,7 +48,7 @@ Ultimo estado live confirmado no servidor:
 - HEAD live:
   - `9653eb0c0e8b5cde836fbaa4449aa8e18b1b1d13`
 - `git status --short` no live estava limpo
-- O branch no GitHub esta agora a frente do live, em `3bad415d950aed9dd2826f8c810337492eeea1a1`.
+- O branch no GitHub continua a frente do live.
 - O live confirmado no servidor continua a ser a referencia operacional de `9653eb0...` ate nova reconciliacao controlada.
 
 ### Servicos validados
@@ -509,6 +509,7 @@ Quando a iteracao do Mac pegar neste contexto, a ordem recomendada e:
 - [LAB_TRADFI_STRATEGY_CANDIDATES_2026-04-29.md](./LAB_TRADFI_STRATEGY_CANDIDATES_2026-04-29.md)
 - [LAB_TRADFI_CONTROLLED_OVERSOLDBOUNCE4H_SPEC_2026-04-29.md](./LAB_TRADFI_CONTROLLED_OVERSOLDBOUNCE4H_SPEC_2026-04-29.md)
 - [LAB_TRADFI_CONTROLLED_OVERSOLDBOUNCE4H_IMPLEMENTATION_TASK_2026-04-29.md](./LAB_TRADFI_CONTROLLED_OVERSOLDBOUNCE4H_IMPLEMENTATION_TASK_2026-04-29.md)
+- [LAB_TRADFI_CONTROLLED_OVERSOLDBOUNCE4H_CHECKLIST_2026-04-29.md](./LAB_TRADFI_CONTROLLED_OVERSOLDBOUNCE4H_CHECKLIST_2026-04-29.md)
 
 ## 12. Nota Final
 

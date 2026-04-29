@@ -23,7 +23,7 @@ Module._load = function mockedLoad(request, parent, isMain) {
             return { macd: 0.22, signal: 0.16, hist: 0.06 };
           }
           if (index === arr.length - 2) {
-            return { macd: 0.2, signal: 0.16, hist: 0.04 };
+            return { macd: 0.20, signal: 0.16, hist: 0.04 };
           }
           if (index === arr.length - 1) {
             return { macd: 0.18, signal: 0.16, hist: 0.02 };
@@ -65,48 +65,12 @@ function makeLongCandles() {
     volume: 100,
   }));
 
-  candles[54] = {
-    open: 99.95,
-    high: 100.18,
-    low: 99.96,
-    close: 100.05,
-    volume: 100,
-  };
-  candles[55] = {
-    open: 100.02,
-    high: 100.22,
-    low: 99.98,
-    close: 100.08,
-    volume: 100,
-  };
-  candles[56] = {
-    open: 100.04,
-    high: 100.18,
-    low: 99.99,
-    close: 100.07,
-    volume: 100,
-  };
-  candles[57] = {
-    open: 100.03,
-    high: 100.2,
-    low: 100,
-    close: 100.09,
-    volume: 100,
-  };
-  candles[58] = {
-    open: 100.01,
-    high: 100.16,
-    low: 99.97,
-    close: 100.06,
-    volume: 100,
-  };
-  candles[59] = {
-    open: 100.01,
-    high: 100.22,
-    low: 99.99,
-    close: 100.12,
-    volume: 80,
-  };
+  candles[54] = { open: 99.95, high: 100.18, low: 99.96, close: 100.05, volume: 100 };
+  candles[55] = { open: 100.02, high: 100.22, low: 99.98, close: 100.08, volume: 100 };
+  candles[56] = { open: 100.04, high: 100.18, low: 99.99, close: 100.07, volume: 100 };
+  candles[57] = { open: 100.03, high: 100.20, low: 100.00, close: 100.09, volume: 100 };
+  candles[58] = { open: 100.01, high: 100.16, low: 99.97, close: 100.06, volume: 100 };
+  candles[59] = { open: 100.01, high: 100.22, low: 99.99, close: 100.12, volume: 80 };
 
   return candles;
 }
@@ -125,6 +89,29 @@ function makeContext(cipherCfg = {}) {
     indicators: {
       entry: 100.05,
       atr: 1,
+      ema20: 100.0,
+      ema50: 99.7,
+      ema200: 99.3,
+      adx: 12,
+      rsi: 50.5,
+    },
+  };
+}
+
+function makeTightTargetContext(cipherCfg = {}) {
+  return {
+    cfg: {
+      CIPHER_CONTINUATION_LONG: {
+        enabled: true,
+        ...cipherCfg,
+      },
+    },
+    helpers: makeHelpers(),
+    candles: makeLongCandles(),
+    nearestResistance: { price: 102.5 },
+    indicators: {
+      entry: 100.005,
+      atr: 0.05,
       ema20: 100.0,
       ema50: 99.7,
       ema200: 99.3,
@@ -167,4 +154,30 @@ test("cipherContinuationLong can allow a narrow pre-MACD structure override", ()
   assert.equal(result.meta.preMacdStructureOverrideRsiOk, true);
   assert.equal(result.meta.preMacdStructureOverrideSignalVolRatioOk, true);
   assert.equal(result.meta.preMacdStructureOverrideExtensionOk, true);
+});
+
+test("cipherContinuationLong blocks tiny pre-MACD targets with minTpPct floor", () => {
+  const result = evaluateCipherContinuationLongStrategy(
+    makeTightTargetContext({
+      minTpPct: 0.001,
+      emaTouchAtr: 1.1,
+      preMacdStructureOverride: {
+        enabled: true,
+        minRr: 0.6,
+        minAdx: 8,
+        minRsi: 49,
+        maxExtensionAtr: 0.1,
+        maxSignalVolRatio: 0.9,
+        requireBullishStack: true,
+        requirePullbackTouchesEma20: true,
+        requirePullbackNearBbBasis: true,
+        requirePullbackStaysAboveEma50: true,
+      },
+    })
+  );
+
+  assert.equal(result.allowed, false);
+  assert.equal(result.reason, "cipherContinuationLong:tp_pct_too_small");
+  assert.equal(result.meta.preMacdStructureOverrideAllowed, true);
+  assert.ok(result.meta.tpPctAfterCap < result.meta.minTpPct);
 });

@@ -293,3 +293,61 @@ test("binance-real tracker updates attached stop on exchange when break-even tri
   assert.equal(state.openSignals[0].breakEvenApplied, true);
   assert.equal(state.executions[0].breakEvenApplied, true);
 });
+
+test("intrabar live-price monitor can trigger break-even without waiting for candle close", async () => {
+  const { executor, core } = loadFreshCoreAndExecutor();
+  const state = {
+    lastSignal: {},
+    openSignals: [],
+    closedSignals: [],
+    executions: [],
+    signalLog: [],
+  };
+
+  const signal = {
+    symbol: "ETHUSDC",
+    tf: "15m",
+    strategy: "trend",
+    direction: "LONG",
+    side: "BUY",
+    entry: 100,
+    sl: 99,
+    tp: 102,
+    score: 82,
+    signalClass: "EXECUTABLE",
+    ts: Date.now(),
+    initialRisk: 1,
+    maxHighDuringTrade: 100,
+    minLowDuringTrade: 100,
+    barsOpen: 1,
+    signalCandleCloseTime: 1_000,
+    openedOnCandleCloseTime: 1_000,
+    lastTrackedCandleCloseTime: 1_000,
+  };
+
+  const openResult = await executor.paperExecute(signal, state, {
+    minScore: 70,
+    allowedClasses: ["EXECUTABLE"],
+    maxOpenTradesTotal: 5,
+    maxOpenTradesPerSymbol: 1,
+    allowedSymbols: ["ETHUSDC"],
+    accountSize: 1000,
+    riskPerTrade: 0.01,
+    maxPositionUsd: 40,
+  });
+
+  assert.equal(openResult.executed, true);
+  signal.executionOrderId = openResult.order.id;
+  state.executions.push(openResult.order);
+  state.openSignals.push(signal);
+
+  executor.fetchFuturesReferencePrice = async () => 100.6;
+
+  const firstPass = await core.monitorOpenSignalsWithLivePrice(state);
+
+  assert.equal(firstPass.length, 0);
+  assert.equal(state.openSignals.length, 1);
+  assert.equal(state.openSignals[0].barsOpen, 1);
+  assert.equal(state.executions[0].breakEvenApplied, true);
+  assert.ok(Number(state.executions[0].sl) > 100);
+});

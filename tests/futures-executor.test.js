@@ -2,6 +2,9 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const Module = require("node:module");
 
+process.env.EXECUTION_MODE = "paper";
+process.env.SQLITE_MIRROR_ENABLED = "0";
+
 const originalLoad = Module._load;
 
 Module._load = function mockedLoad(request, parent, isMain) {

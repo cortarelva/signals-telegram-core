@@ -2251,6 +2251,7 @@ module.exports = {
   paperExecute,
   closeExecutionForSignal,
   forceCloseExecutionById,
+  fetchFuturesReferencePrice,
   moveExecutionStopToBreakEven,
   calcPnlPct,
   calcPnlUsd,

@@ -978,9 +978,19 @@ function getSignalTrackingBaselineCloseTime(signal) {
   return timestampCandidates.length ? Math.max(...timestampCandidates) : 0;
 }
 
-async function updateTracker(
+async function trackOpenSignalsAgainstObservation(
   state,
-  { symbol, tf, candleHigh, candleLow, candleClose, candleCloseTime }
+  {
+    symbol,
+    tf,
+    observationHigh,
+    observationLow,
+    observationClose,
+    observationTime = Date.now(),
+    candleCloseTime = null,
+    dedupeByCandle = false,
+    incrementBars = false,
+  }
 ) {
   if (!Array.isArray(state.openSignals) || state.openSignals.length === 0) {
     return [];
@@ -997,6 +1007,7 @@ async function updateTracker(
 
     const normalizedCandleCloseTime = Number(candleCloseTime);
     const canDeduplicateByCandle =
+      dedupeByCandle &&
       Number.isFinite(normalizedCandleCloseTime) && normalizedCandleCloseTime > 0;
     const trackingBaseline = getSignalTrackingBaselineCloseTime(s);
 
@@ -1009,19 +1020,28 @@ async function updateTracker(
       s.lastTrackedCandleCloseTime = normalizedCandleCloseTime;
     }
 
-    s.maxHighDuringTrade = Math.max(s.maxHighDuringTrade ?? candleHigh, candleHigh);
-    s.minLowDuringTrade = Math.min(s.minLowDuringTrade ?? candleLow, candleLow);
-    s.barsOpen = (s.barsOpen ?? 0) + 1;
+    s.maxHighDuringTrade = Math.max(
+      Number(s.maxHighDuringTrade ?? observationHigh),
+      Number(observationHigh)
+    );
+    s.minLowDuringTrade = Math.min(
+      Number(s.minLowDuringTrade ?? observationLow),
+      Number(observationLow)
+    );
+
+    if (incrementBars) {
+      s.barsOpen = (s.barsOpen ?? 0) + 1;
+    }
 
     const direction = String(s.direction || s.side || "LONG").toUpperCase();
 
     let outcome = null;
     if (direction === "SHORT" || direction === "SELL") {
-      if (candleHigh >= s.sl) outcome = "SL";
-      else if (candleLow <= s.tp) outcome = "TP";
+      if (observationHigh >= s.sl) outcome = "SL";
+      else if (observationLow <= s.tp) outcome = "TP";
     } else {
-      if (candleLow <= s.sl) outcome = "SL";
-      else if (candleHigh >= s.tp) outcome = "TP";
+      if (observationLow <= s.sl) outcome = "SL";
+      else if (observationHigh >= s.tp) outcome = "TP";
     }
     if (!outcome) {
       // Break-even / trailing-to-non-negative (local tracker only)
@@ -1048,8 +1068,8 @@ async function updateTracker(
           if (Number.isFinite(initialRisk) && initialRisk > 0) {
             const favMove =
               direction === "LONG"
-                ? Number(candleHigh) - Number(s.entry)
-                : Number(s.entry) - Number(candleLow);
+                ? Number(observationHigh) - Number(s.entry)
+                : Number(s.entry) - Number(observationLow);
 
             const rNow = favMove / initialRisk;
 
@@ -1116,7 +1136,7 @@ async function updateTracker(
                         s.prevSl = s.sl;
                         s.sl = Number(updateResult.stopPrice || newSL);
                         s.breakEvenApplied = true;
-                        s.breakEvenAt = Date.now();
+                        s.breakEvenAt = Number(observationTime || Date.now());
                         s.breakEvenAtR = rNow;
 
                         matchedExecution.prevSl = Number(
@@ -1138,7 +1158,7 @@ async function updateTracker(
                   s.prevSl = s.sl;
                   s.sl = newSL;
                   s.breakEvenApplied = true;
-                  s.breakEvenAt = Date.now();
+                  s.breakEvenAt = Number(observationTime || Date.now());
                   s.breakEvenAtR = rNow;
 
                   if (matchedExecution) {
@@ -1168,7 +1188,7 @@ async function updateTracker(
 
     s.closedTs = Date.now();
     s.outcome = outcome;
-    s.exitRef = candleClose;
+    s.exitRef = observationClose;
     s.pnlPct = calcPnlPctByDirection(s.entry, exitPrice, direction);
     s.rrRealized = safeRatio(reward, risk);
 
@@ -1181,6 +1201,223 @@ async function updateTracker(
   state.closedSignals.push(...closedNow);
 
   return closedNow;
+}
+
+async function updateTracker(
+  state,
+  { symbol, tf, candleHigh, candleLow, candleClose, candleCloseTime }
+) {
+  return trackOpenSignalsAgainstObservation(state, {
+    symbol,
+    tf,
+    observationHigh: candleHigh,
+    observationLow: candleLow,
+    observationClose: candleClose,
+    observationTime: Date.now(),
+    candleCloseTime,
+    dedupeByCandle: true,
+    incrementBars: true,
+  });
+}
+
+async function monitorOpenSignalsWithLivePrice(state) {
+  if (!Array.isArray(state.openSignals) || state.openSignals.length === 0) {
+    return [];
+  }
+
+  const uniqueSymbolTfPairs = Array.from(
+    new Set(
+      state.openSignals
+        .map((signal) => {
+          const symbol = String(signal?.symbol || "").trim().toUpperCase();
+          const tf = String(signal?.tf || "").trim();
+          return symbol && tf ? `${symbol}::${tf}` : null;
+        })
+        .filter(Boolean)
+    )
+  );
+
+  const priceCache = new Map();
+  const closedNow = [];
+
+  for (const pair of uniqueSymbolTfPairs) {
+    const [symbol, tf] = pair.split("::");
+    if (!symbol || !tf) continue;
+
+    let referencePrice = priceCache.get(symbol);
+    if (!Number.isFinite(referencePrice) || referencePrice <= 0) {
+      referencePrice = await futuresExecutor.fetchFuturesReferencePrice(symbol);
+      if (Number.isFinite(referencePrice) && referencePrice > 0) {
+        priceCache.set(symbol, referencePrice);
+      }
+    }
+
+    if (!Number.isFinite(referencePrice) || referencePrice <= 0) {
+      console.warn(`[TRACKER_LIVE] ${symbol} ${tf} sem mark/reference price`);
+      continue;
+    }
+
+    const justClosed = await trackOpenSignalsAgainstObservation(state, {
+      symbol,
+      tf,
+      observationHigh: referencePrice,
+      observationLow: referencePrice,
+      observationClose: referencePrice,
+      observationTime: Date.now(),
+      candleCloseTime: null,
+      dedupeByCandle: false,
+      incrementBars: false,
+    });
+
+    closedNow.push(...justClosed);
+  }
+
+  return closedNow;
+}
+
+async function settleClosedSignals(state, closedNow) {
+  for (const c of Array.isArray(closedNow) ? closedNow : []) {
+    const symbol = c.symbol;
+    const symbolTf = c.tf;
+    let closedExec = null;
+
+    try {
+      closedExec = await futuresExecutor.closeExecutionForSignal(state, c);
+    } catch (err) {
+      console.error(
+        `[EXECUTOR_CLOSE] erro ao fechar ${c.symbol}:`,
+        err.body || err.message || err
+      );
+    }
+
+    if (closedExec) {
+      const direction = String(c.direction || c.side || "LONG").toUpperCase();
+      const actualExit = Number(closedExec.exitPrice);
+      const actualPnlPct = Number(closedExec.pnlPct);
+      const entryRef = Number(c.entry ?? closedExec.entry);
+      const riskRef =
+        Number.isFinite(Number(c.initialRisk)) && Number(c.initialRisk) > 0
+          ? Number(c.initialRisk)
+          : Math.abs(Number(entryRef) - Number(c.sl ?? closedExec.sl));
+
+      c.closedTs = Number(closedExec.closedTs || c.closedTs || Date.now());
+      c.closeReason = closedExec.closeReason || c.closeReason || c.outcome || null;
+
+      if (Number.isFinite(actualExit) && actualExit > 0) {
+        c.exitRef = actualExit;
+      }
+
+      if (Number.isFinite(actualPnlPct)) {
+        c.pnlPct = actualPnlPct;
+      }
+
+      if (Number.isFinite(Number(closedExec.pnlUsd))) {
+        c.realizedPnlUsd = Number(closedExec.pnlUsd);
+      }
+
+      if (Number.isFinite(Number(closedExec.entryPlanned))) {
+        c.entryPlanned = Number(closedExec.entryPlanned);
+      }
+
+      if (Number.isFinite(Number(closedExec.entryFill))) {
+        c.entryFill = Number(closedExec.entryFill);
+      }
+
+      if (Number.isFinite(Number(closedExec.exitPlanned))) {
+        c.exitPlanned = Number(closedExec.exitPlanned);
+      }
+
+      if (Number.isFinite(Number(closedExec.exitFill))) {
+        c.exitFill = Number(closedExec.exitFill);
+      }
+
+      if (Number.isFinite(Number(closedExec.pnlTheoretical))) {
+        c.pnlTheoretical = Number(closedExec.pnlTheoretical);
+      }
+
+      if (Number.isFinite(Number(closedExec.pnlRealizedGross))) {
+        c.pnlRealizedGross = Number(closedExec.pnlRealizedGross);
+      }
+
+      if (Number.isFinite(Number(closedExec.fees))) {
+        c.fees = Number(closedExec.fees);
+      }
+
+      if (Number.isFinite(Number(closedExec.pnlRealizedNet))) {
+        c.pnlRealizedNet = Number(closedExec.pnlRealizedNet);
+      }
+
+      if (closedExec.closeReasonInternal) {
+        c.closeReasonInternal = closedExec.closeReasonInternal;
+      }
+
+      if (closedExec.closeReasonExchange) {
+        c.closeReasonExchange = closedExec.closeReasonExchange;
+      }
+
+      if (closedExec.pnlSource) {
+        c.pnlSource = closedExec.pnlSource;
+      }
+
+      if (closedExec.exchange?.protectionStatus) {
+        c.protectionStatus = closedExec.exchange.protectionStatus;
+      }
+
+      if (Number.isFinite(Number(closedExec.riskUsd))) {
+        c.riskUsd = Number(closedExec.riskUsd);
+      }
+
+      if (Number.isFinite(Number(closedExec.positionNotional))) {
+        c.positionSizeUsd = Number(closedExec.positionNotional);
+      }
+
+      if (Number.isFinite(Number(closedExec.leverage))) {
+        c.leverage = Number(closedExec.leverage);
+      }
+
+      if (
+        Number.isFinite(actualExit) &&
+        actualExit > 0 &&
+        Number.isFinite(entryRef) &&
+        entryRef > 0 &&
+        Number.isFinite(riskRef) &&
+        riskRef > 0
+      ) {
+        const reward =
+          direction === "SHORT" || direction === "SELL"
+            ? entryRef - actualExit
+            : actualExit - entryRef;
+        c.rrRealized = safeRatio(reward, riskRef);
+      }
+    }
+
+    const effectivePnl = Number.isFinite(Number(closedExec?.pnlPct))
+      ? Number(closedExec.pnlPct)
+      : Number(c.pnlPct || 0);
+
+    const effectiveExit = Number.isFinite(Number(closedExec?.exitPrice))
+      ? Number(closedExec.exitPrice)
+      : Number(c.exitRef || 0);
+
+    console.log(
+      `[TRACKER] ${symbol} ${symbolTf} closed outcome=${c.outcome} entry=${round(
+        c.entry,
+        6
+      )} exit=${round(effectiveExit, 6)} pnlPct=${round(
+        effectivePnl,
+        2
+      )} rr=${round(c.rrRealized ?? 0, 2)}`
+    );
+
+    const closeMsg = buildClosedTradeTelegramMessage({
+      symbol,
+      tf: symbolTf,
+      closedSignal: c,
+      closedExecution: closedExec,
+    });
+
+    await sendTelegramMessage(closeMsg);
+  }
 }
 
 function shouldSendSignal(state, signalObj, cooldownMins = 10) {
@@ -1676,147 +1913,7 @@ async function processSymbol(
     candleClose: last.close,
     candleCloseTime: last.closeTime,
   });
-
-  for (const c of closedNow) {
-    let closedExec = null;
-
-    try {
-      closedExec = await futuresExecutor.closeExecutionForSignal(state, c);
-    } catch (err) {
-      console.error(
-        `[EXECUTOR_CLOSE] erro ao fechar ${c.symbol}:`,
-        err.body || err.message || err
-      );
-    }
-
-    if (closedExec) {
-      const direction = String(c.direction || c.side || "LONG").toUpperCase();
-      const actualExit = Number(closedExec.exitPrice);
-      const actualPnlPct = Number(closedExec.pnlPct);
-      const entryRef = Number(c.entry ?? closedExec.entry);
-      const riskRef =
-        Number.isFinite(Number(c.initialRisk)) && Number(c.initialRisk) > 0
-          ? Number(c.initialRisk)
-          : Math.abs(Number(entryRef) - Number(c.sl ?? closedExec.sl));
-
-      c.closedTs = Number(closedExec.closedTs || c.closedTs || Date.now());
-      c.closeReason = closedExec.closeReason || c.closeReason || c.outcome || null;
-
-      if (Number.isFinite(actualExit) && actualExit > 0) {
-        c.exitRef = actualExit;
-      }
-
-      if (Number.isFinite(actualPnlPct)) {
-        c.pnlPct = actualPnlPct;
-      }
-
-      if (Number.isFinite(Number(closedExec.pnlUsd))) {
-        c.realizedPnlUsd = Number(closedExec.pnlUsd);
-      }
-
-      if (Number.isFinite(Number(closedExec.entryPlanned))) {
-        c.entryPlanned = Number(closedExec.entryPlanned);
-      }
-
-      if (Number.isFinite(Number(closedExec.entryFill))) {
-        c.entryFill = Number(closedExec.entryFill);
-      }
-
-      if (Number.isFinite(Number(closedExec.exitPlanned))) {
-        c.exitPlanned = Number(closedExec.exitPlanned);
-      }
-
-      if (Number.isFinite(Number(closedExec.exitFill))) {
-        c.exitFill = Number(closedExec.exitFill);
-      }
-
-      if (Number.isFinite(Number(closedExec.pnlTheoretical))) {
-        c.pnlTheoretical = Number(closedExec.pnlTheoretical);
-      }
-
-      if (Number.isFinite(Number(closedExec.pnlRealizedGross))) {
-        c.pnlRealizedGross = Number(closedExec.pnlRealizedGross);
-      }
-
-      if (Number.isFinite(Number(closedExec.fees))) {
-        c.fees = Number(closedExec.fees);
-      }
-
-      if (Number.isFinite(Number(closedExec.pnlRealizedNet))) {
-        c.pnlRealizedNet = Number(closedExec.pnlRealizedNet);
-      }
-
-      if (closedExec.closeReasonInternal) {
-        c.closeReasonInternal = closedExec.closeReasonInternal;
-      }
-
-      if (closedExec.closeReasonExchange) {
-        c.closeReasonExchange = closedExec.closeReasonExchange;
-      }
-
-      if (closedExec.pnlSource) {
-        c.pnlSource = closedExec.pnlSource;
-      }
-
-      if (closedExec.exchange?.protectionStatus) {
-        c.protectionStatus = closedExec.exchange.protectionStatus;
-      }
-
-      if (Number.isFinite(Number(closedExec.riskUsd))) {
-        c.riskUsd = Number(closedExec.riskUsd);
-      }
-
-      if (Number.isFinite(Number(closedExec.positionNotional))) {
-        c.positionSizeUsd = Number(closedExec.positionNotional);
-      }
-
-      if (Number.isFinite(Number(closedExec.leverage))) {
-        c.leverage = Number(closedExec.leverage);
-      }
-
-      if (
-        Number.isFinite(actualExit) &&
-        actualExit > 0 &&
-        Number.isFinite(entryRef) &&
-        entryRef > 0 &&
-        Number.isFinite(riskRef) &&
-        riskRef > 0
-      ) {
-        const reward =
-          direction === "SHORT" || direction === "SELL"
-            ? entryRef - actualExit
-            : actualExit - entryRef;
-        c.rrRealized = safeRatio(reward, riskRef);
-      }
-    }
-
-    const effectivePnl = Number.isFinite(Number(closedExec?.pnlPct))
-      ? Number(closedExec.pnlPct)
-      : Number(c.pnlPct || 0);
-
-    const effectiveExit = Number.isFinite(Number(closedExec?.exitPrice))
-      ? Number(closedExec.exitPrice)
-      : Number(c.exitRef || 0);
-
-    console.log(
-      `[TRACKER] ${symbol} ${symbolTf} closed outcome=${c.outcome} entry=${round(
-        c.entry,
-        6
-      )} exit=${round(effectiveExit, 6)} pnlPct=${round(
-        effectivePnl,
-        2
-      )} rr=${round(c.rrRealized ?? 0, 2)}`
-    );
-
-    const closeMsg = buildClosedTradeTelegramMessage({
-      symbol,
-      tf: symbolTf,
-      closedSignal: c,
-      closedExecution: closedExec,
-    });
-
-    await sendTelegramMessage(closeMsg);
-  }
+  await settleClosedSignals(state, closedNow);
 
   console.log(
     `[REGIME] ${symbol} trend=${isTrend} range=${isRange} ` +
@@ -2379,6 +2476,15 @@ async function processSymbol(
 
 async function main() {
   const state = loadState();
+  const managementOnly = String(process.env.BOT_MANAGEMENT_ONLY || "0") === "1";
+  const intrabarClosedNow = await monitorOpenSignalsWithLivePrice(state);
+  await settleClosedSignals(state, intrabarClosedNow);
+
+  if (managementOnly) {
+    saveState(state);
+    return;
+  }
+
   const enabledRuns = getEnabledSymbolRuns();
   const enabledCryptoSymbols = Array.from(
     new Set(
@@ -2449,6 +2555,7 @@ module.exports = {
   saveState,
   fetchKlines,
   findOpenExecutionForSignal,
+  monitorOpenSignalsWithLivePrice,
   updateTracker,
   shouldSendSignal,
   processSymbol,

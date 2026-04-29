@@ -38,6 +38,7 @@
     "compare:real-vs-backtest": "node research/compare-real-vs-backtest.js",
     "mine:opportunities": "node research/mine-opportunity-events.js",
     "compare:btc-gated-breakdown": "node research/compare-btc-gated-breakdown.js",
+    "compare:vortex-filter": "node research/compare-vortex-filter.js",
     "factor:btc-context": "node research/analyze-btc-factor-context.js",
     "monte:trades": "node research/monte-carlo-trade-list.js",
     "report:promotion-gates": "node research/build-promotion-gate-report.js",

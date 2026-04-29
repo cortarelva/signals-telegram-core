@@ -1363,6 +1363,7 @@ module.exports = {
   parseConfigOverrides,
   parseOptionalNumber,
   resolveTradeManagement,
+  resolveRequestedStrategies,
   createFallbackSymbolConfig,
   mergeDeep,
   fetchAvailableFuturesSymbols,
@@ -1379,4 +1380,5 @@ module.exports = {
   normalizeResult,
   formatIso,
   round,
+  STRATEGY_REGISTRY,
 };

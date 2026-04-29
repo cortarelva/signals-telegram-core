@@ -217,6 +217,96 @@ function calcADX(candles, period = 14) {
   return dxs.length ? dxs[dxs.length - 1] : null;
 }
 
+function calcVortexSeries(candles, period = 14) {
+  if (!Array.isArray(candles) || candles.length < period + 1) return [];
+
+  const trSeries = [];
+  const plusVmSeries = [];
+  const minusVmSeries = [];
+
+  for (let i = 1; i < candles.length; i += 1) {
+    const curr = candles[i];
+    const prev = candles[i - 1];
+
+    const high = Number(curr?.high);
+    const low = Number(curr?.low);
+    const prevHigh = Number(prev?.high);
+    const prevLow = Number(prev?.low);
+    const prevClose = Number(prev?.close);
+
+    if (
+      !Number.isFinite(high) ||
+      !Number.isFinite(low) ||
+      !Number.isFinite(prevHigh) ||
+      !Number.isFinite(prevLow) ||
+      !Number.isFinite(prevClose)
+    ) {
+      trSeries.push(null);
+      plusVmSeries.push(null);
+      minusVmSeries.push(null);
+      continue;
+    }
+
+    trSeries.push(
+      Math.max(
+        high - low,
+        Math.abs(high - prevClose),
+        Math.abs(low - prevClose)
+      )
+    );
+    plusVmSeries.push(Math.abs(high - prevLow));
+    minusVmSeries.push(Math.abs(low - prevHigh));
+  }
+
+  const out = new Array(candles.length).fill(null);
+
+  for (let trIndex = period - 1; trIndex < trSeries.length; trIndex += 1) {
+    let trSum = 0;
+    let plusVmSum = 0;
+    let minusVmSum = 0;
+    let valid = true;
+
+    for (
+      let windowIndex = trIndex - period + 1;
+      windowIndex <= trIndex;
+      windowIndex += 1
+    ) {
+      const tr = trSeries[windowIndex];
+      const plusVm = plusVmSeries[windowIndex];
+      const minusVm = minusVmSeries[windowIndex];
+
+      if (
+        !Number.isFinite(tr) ||
+        !Number.isFinite(plusVm) ||
+        !Number.isFinite(minusVm)
+      ) {
+        valid = false;
+        break;
+      }
+
+      trSum += tr;
+      plusVmSum += plusVm;
+      minusVmSum += minusVm;
+    }
+
+    if (!valid || trSum <= 0) continue;
+
+    const viPlus = plusVmSum / trSum;
+    const viMinus = minusVmSum / trSum;
+    const spread = Math.abs(viPlus - viMinus);
+
+    out[trIndex + 1] = {
+      viPlus,
+      viMinus,
+      spread,
+      direction:
+        viPlus > viMinus ? "up" : viMinus > viPlus ? "down" : "flat",
+    };
+  }
+
+  return out;
+}
+
 function detectMarketRegime({
   lastClose,
   ema20,
@@ -275,6 +365,7 @@ module.exports = {
   calcRSISeries,
   calcATR,
   calcADX,
+  calcVortexSeries,
   calcBollingerBands,
   calcMACDSeries,
   detectMarketRegime,

@@ -1,5 +1,5 @@
 [Unit]
-Description=TorusAiTrading Narrow Strategy Hunt
+Description=TorusAiTrading Broad Strategy Hunt
 After=network-online.target
 Wants=network-online.target
 
@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=oneshot
 User=torus
 WorkingDirectory=/opt/TorusAiTrading
-ExecStart=/usr/bin/bash /opt/TorusAiTrading/runtime/run-strategy-hunt-narrow.sh
+ExecStart=/usr/bin/bash /opt/TorusAiTrading/runtime/run-strategy-hunt-broad.sh
 
 [Install]
 WantedBy=multi-user.target

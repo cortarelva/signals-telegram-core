@@ -22,6 +22,7 @@ const DEFAULT_TFS = ["15m", "1h"];
 const DEFAULT_HTF_TF = "1d";
 const DEFAULT_FEE_RATE = "0.0004";
 const DEFAULT_SLIPPAGE_PCT = "0.00025";
+const DEFAULT_PROFILE_NAME = "default";
 
 function parseList(rawValue, fallback = []) {
   if (!rawValue || typeof rawValue !== "string") return [...fallback];
@@ -239,6 +240,9 @@ function main() {
     process.cwd(),
     process.env.STRATEGY_HUNT_OUTPUT_DIR || DEFAULT_OUTPUT_DIR
   );
+  const profile = String(
+    process.env.STRATEGY_HUNT_PROFILE_NAME || DEFAULT_PROFILE_NAME
+  ).trim();
 
   const batchOutputs = [];
   let allCandidates = [];
@@ -266,6 +270,7 @@ function main() {
   const summary = buildSummary(allCandidates);
   const report = {
     generatedAt: new Date().toISOString(),
+    profile,
     symbols,
     timeframes,
     htfTf,

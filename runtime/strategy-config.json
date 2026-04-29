@@ -292,6 +292,7 @@
     },
     "CIPHER_CONTINUATION_LONG": {
       "enabled": true,
+      "minTpPct": 0.001,
       "ema200BufferPct": 0.006,
       "preMacdStructureOverride": {
         "enabled": true,
@@ -572,7 +573,8 @@
       "enabled": false
     },
     "CIPHER_CONTINUATION_LONG": {
-      "enabled": true
+      "enabled": true,
+      "minTpPct": 0.001
     },
     "TREND": {
       "enabled": false

@@ -10,7 +10,7 @@ const TWELVE_DATA_API_BASE =
   process.env.TWELVE_DATA_API_BASE || "https://api.twelvedata.com";
 const DEFAULT_PROVIDER = String(process.env.EXTERNAL_HISTORY_PROVIDER || "auto").toLowerCase();
 const DEFAULT_TWELVE_MIN_INTERVAL_MS = Number(
-  process.env.TWELVE_DATA_MIN_INTERVAL_MS || 8000
+  process.env.TWELVE_DATA_MIN_INTERVAL_MS || 3000
 );
 const DEFAULT_TWELVE_RATE_LIMIT_BACKOFF_MS = Number(
   process.env.TWELVE_DATA_RATE_LIMIT_BACKOFF_MS || 65000

@@ -5,7 +5,7 @@
   "presetFile": "research/tradfi-twelve-equities-preset.json",
   "recommendationsFile": "research/tradfi-twelve-equities-recommendations.json",
   "paperPolicyFile": "research/tradfi-twelve-equities-paper-policy.json",
-  "profileCooldownSeconds": 65,
+  "profileCooldownSeconds": 20,
   "profiles": [
     {
       "label": "equities_reversal_1h_1d_core",

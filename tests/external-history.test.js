@@ -141,8 +141,8 @@ test("resolveExternalHistoryProvider no longer auto-activates EODHD", () => {
   );
 });
 
-test("getTwelveDataMinIntervalMs defaults to an 8 second spacing", () => {
-  assert.equal(getTwelveDataMinIntervalMs({}), 8000);
+test("getTwelveDataMinIntervalMs defaults to a 3 second spacing", () => {
+  assert.equal(getTwelveDataMinIntervalMs({}), 3000);
   assert.equal(getTwelveDataMinIntervalMs({ TWELVE_DATA_MIN_INTERVAL_MS: "12000" }), 12000);
 });
 

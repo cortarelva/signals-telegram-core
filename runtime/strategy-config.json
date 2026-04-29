@@ -227,7 +227,7 @@
         }
       }
     ],
-    "ENABLED": false
+    "ENABLED": true
   },
   "BNBUSDC": {
     "RSI_MIN": 35,

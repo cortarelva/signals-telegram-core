@@ -67,6 +67,11 @@ function evaluateCipherContinuationLongStrategy(ctx) {
       cfg.MIN_TP_PCT_AFTER_CAP ??
       0.0012
   );
+  const minTpPct = Number(
+    cipherCfg.minTpPct ??
+      cfg.CIPHER_CONTINUATION_LONG_MIN_TP_PCT ??
+      0
+  );
   const preMacdStructureOverrideCfg =
     cipherCfg.preMacdStructureOverride || {};
   const preMacdStructureOverrideEnabled =
@@ -459,6 +464,49 @@ function evaluateCipherContinuationLongStrategy(ctx) {
     };
   }
 
+  if (
+    Number.isFinite(minTpPct) &&
+    minTpPct > 0 &&
+    (!Number.isFinite(tpPctAfterCap) || tpPctAfterCap < minTpPct)
+  ) {
+    return {
+      strategy: "cipherContinuationLong",
+      direction: "LONG",
+      allowed: false,
+      score,
+      signalClass,
+      minScore,
+      reason: "cipherContinuationLong:tp_pct_too_small",
+      meta: {
+        trendMode,
+        bullishBias,
+        ema20AboveEma50,
+        bullishStack,
+        aboveEma200,
+        ema50AboveOrNearEma200,
+        aboveEma50,
+        extensionAtr,
+        pullbackLow,
+        pullbackTouchesEma20,
+        pullbackNearBbBasis,
+        pullbackStaysAboveEma50,
+        macdHist: macdNow.hist,
+        prevMacdHist: macdPrev.hist,
+        rsi,
+        macdReaccelerating,
+        bbBasis: bb.basis,
+        bbLower: bb.lower,
+        signalVolRatio,
+        plannedRr,
+        tpPctAfterCap,
+        minTpPct,
+        validRiskShape,
+        preMacdStructureOverrideEnabled,
+        preMacdStructureOverrideAllowed,
+      },
+    };
+  }
+
   return {
     strategy: "cipherContinuationLong",
     direction: "LONG",
@@ -496,6 +544,7 @@ function evaluateCipherContinuationLongStrategy(ctx) {
       signalVolRatio,
       plannedRr,
       tpPctAfterCap,
+      minTpPct,
       validRiskShape,
       preMacdStructureOverrideEnabled,
       preMacdStructureOverrideAllowed,

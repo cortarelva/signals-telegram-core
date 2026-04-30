@@ -351,3 +351,72 @@ test("intrabar live-price monitor can trigger break-even without waiting for can
   assert.equal(state.executions[0].breakEvenApplied, true);
   assert.ok(Number(state.executions[0].sl) > 100);
 });
+
+test("signal-specific break-even overrides can arm earlier than the global setting", async () => {
+  const { executor, core } = loadFreshCoreAndExecutor();
+  process.env.BREAK_EVEN_TRIGGER_R = "0.4";
+  process.env.BREAK_EVEN_LOCK_R = "0.02";
+  process.env.BREAK_EVEN_MIN_BARS = "1";
+
+  const state = {
+    lastSignal: {},
+    openSignals: [],
+    closedSignals: [],
+    executions: [],
+    signalLog: [],
+  };
+
+  const signal = {
+    symbol: "BTCUSDC",
+    tf: "1h",
+    strategy: "cipherContinuationShort",
+    direction: "SHORT",
+    side: "SELL",
+    entry: 100,
+    sl: 110,
+    tp: 93,
+    score: 100,
+    signalClass: "EXECUTABLE",
+    ts: Date.now(),
+    initialRisk: 10,
+    maxHighDuringTrade: 100,
+    minLowDuringTrade: 100,
+    barsOpen: 0,
+    signalCandleCloseTime: 1_000,
+    openedOnCandleCloseTime: 1_000,
+    lastTrackedCandleCloseTime: 1_000,
+    managementBreakEvenTriggerR: 0.3,
+    managementBreakEvenLockR: 0.1,
+    managementBreakEvenMinBars: 1,
+  };
+
+  const openResult = await executor.paperExecute(signal, state, {
+    minScore: 70,
+    allowedClasses: ["EXECUTABLE"],
+    maxOpenTradesTotal: 5,
+    maxOpenTradesPerSymbol: 1,
+    allowedSymbols: ["BTCUSDC"],
+    accountSize: 1000,
+    riskPerTrade: 0.01,
+    maxPositionUsd: 40,
+  });
+
+  assert.equal(openResult.executed, true);
+  signal.executionOrderId = openResult.order.id;
+  state.executions.push(openResult.order);
+  state.openSignals.push(signal);
+
+  const firstPass = await core.updateTracker(state, {
+    symbol: "BTCUSDC",
+    tf: "1h",
+    candleHigh: 100.2,
+    candleLow: 96.9,
+    candleClose: 97.4,
+    candleCloseTime: 2_000,
+  });
+
+  assert.equal(firstPass.length, 0);
+  assert.equal(state.openSignals[0].breakEvenApplied, true);
+  assert.equal(state.executions[0].breakEvenApplied, true);
+  assert.equal(Number(state.openSignals[0].sl.toFixed(6)), 99);
+});

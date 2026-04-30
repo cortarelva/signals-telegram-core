@@ -182,6 +182,33 @@ function getStrategyExecutionOverrides(cfg = {}, strategyName) {
   };
 }
 
+function getStrategyManagementOverrides(cfg = {}, strategyName) {
+  const strategyKey = STRATEGY_CONFIG_KEY_BY_NAME[strategyName] || null;
+  const strategyCfg =
+    strategyKey && isPlainObject(cfg?.[strategyKey]) ? cfg[strategyKey] : {};
+  const managementCfg = isPlainObject(strategyCfg?.MANAGEMENT)
+    ? strategyCfg.MANAGEMENT
+    : {};
+
+  const breakEvenTriggerR = toPositiveNumber(
+    managementCfg.breakEvenTriggerR ?? strategyCfg.breakEvenTriggerR
+  );
+  const breakEvenLockRRaw =
+    managementCfg.breakEvenLockR ?? strategyCfg.breakEvenLockR;
+  const breakEvenLockR = Number.isFinite(Number(breakEvenLockRRaw))
+    ? Math.max(0, Number(breakEvenLockRRaw))
+    : null;
+  const breakEvenMinBars = toPositiveInteger(
+    managementCfg.breakEvenMinBars ?? strategyCfg.breakEvenMinBars
+  );
+
+  return {
+    breakEvenTriggerR,
+    breakEvenLockR,
+    breakEvenMinBars,
+  };
+}
+
 function getStrategyBtcContextGate(cfg = {}, strategyName) {
   const strategyKey = STRATEGY_CONFIG_KEY_BY_NAME[strategyName] || null;
   const strategyCfg =
@@ -1050,9 +1077,28 @@ async function trackOpenSignalsAgainstObservation(
         EXECUTION_MODE === "binance_real" && FUTURES_ATTACH_TPSL_ON_ENTRY;
       const canApplyLocalBreakEven = !canApplyExchangeBreakEven;
       if (BREAK_EVEN_ENABLED && !s.breakEvenApplied) {
-        const BREAK_EVEN_TRIGGER_R = Number(process.env.BREAK_EVEN_TRIGGER_R || 0.65);
-        const BREAK_EVEN_LOCK_R = Number(process.env.BREAK_EVEN_LOCK_R || 0.0);
-        const BREAK_EVEN_MIN_BARS = Number(process.env.BREAK_EVEN_MIN_BARS || 1);
+        const matchedExecution =
+          canApplyLocalBreakEven || canApplyExchangeBreakEven
+            ? findOpenExecutionForSignal(state, s)
+            : null;
+        const BREAK_EVEN_TRIGGER_R = Number(
+          s.managementBreakEvenTriggerR ??
+            matchedExecution?.managementBreakEvenTriggerR ??
+            process.env.BREAK_EVEN_TRIGGER_R ??
+            0.65
+        );
+        const BREAK_EVEN_LOCK_R = Number(
+          s.managementBreakEvenLockR ??
+            matchedExecution?.managementBreakEvenLockR ??
+            process.env.BREAK_EVEN_LOCK_R ??
+            0.0
+        );
+        const BREAK_EVEN_MIN_BARS = Number(
+          s.managementBreakEvenMinBars ??
+            matchedExecution?.managementBreakEvenMinBars ??
+            process.env.BREAK_EVEN_MIN_BARS ??
+            1
+        );
         const BREAK_EVEN_MIN_NET_USD = Number(process.env.BREAK_EVEN_MIN_NET_USD || 0);
         const BREAK_EVEN_COST_BUFFER_USD = Number(
           process.env.BREAK_EVEN_COST_BUFFER_USD || 0
@@ -1074,11 +1120,6 @@ async function trackOpenSignalsAgainstObservation(
             const rNow = favMove / initialRisk;
 
             if (Number.isFinite(rNow) && rNow >= BREAK_EVEN_TRIGGER_R) {
-              const matchedExecution =
-                canApplyLocalBreakEven || canApplyExchangeBreakEven
-                  ? findOpenExecutionForSignal(state, s)
-                  : null;
-
               let newSL =
                 direction === "LONG"
                   ? Number(s.entry) + initialRisk * BREAK_EVEN_LOCK_R
@@ -2015,6 +2056,10 @@ async function processSymbol(
     cfg,
     selectedStrategy || btcContextProbeStrategy
   );
+  const managementOverrides = getStrategyManagementOverrides(
+    cfg,
+    selectedStrategy || btcContextProbeStrategy
+  );
 
   if (!Array.isArray(state.signalLog)) {
     state.signalLog = [];
@@ -2117,6 +2162,9 @@ async function processSymbol(
       executionOverrides.maxConsecutiveLosses,
     executionLossStreakCooldownMins:
       executionOverrides.lossStreakCooldownMins,
+    managementBreakEvenTriggerR: managementOverrides.breakEvenTriggerR,
+    managementBreakEvenLockR: managementOverrides.breakEvenLockR,
+    managementBreakEvenMinBars: managementOverrides.breakEvenMinBars,
     btcContextGateStrategy: btcContextProbeStrategy,
     btcContextGateApplied: false,
     btcContextGatePassed: true,
@@ -2317,6 +2365,9 @@ async function processSymbol(
       executionOverrides.maxConsecutiveLosses,
     executionLossStreakCooldownMins:
       executionOverrides.lossStreakCooldownMins,
+    managementBreakEvenTriggerR: managementOverrides.breakEvenTriggerR,
+    managementBreakEvenLockR: managementOverrides.breakEvenLockR,
+    managementBreakEvenMinBars: managementOverrides.breakEvenMinBars,
     btcContextGateStrategy: btcContextProbeStrategy,
   };
 

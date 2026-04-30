@@ -164,7 +164,12 @@
       "enabled": true
     },
     "CIPHER_CONTINUATION_SHORT": {
-      "enabled": true
+      "enabled": true,
+      "MANAGEMENT": {
+        "breakEvenTriggerR": 0.3,
+        "breakEvenLockR": 0.1,
+        "breakEvenMinBars": 1
+      }
     },
     "TREND": {
       "enabled": false

@@ -2080,6 +2080,21 @@ async function paperExecute(signalObj, state, options = {}) {
   });
   execution.entryFill = execution.entry;
   execution.entryPlanned = execution.entry;
+  execution.managementBreakEvenTriggerR = Number.isFinite(
+    Number(executionSignal.managementBreakEvenTriggerR)
+  )
+    ? Number(executionSignal.managementBreakEvenTriggerR)
+    : null;
+  execution.managementBreakEvenLockR = Number.isFinite(
+    Number(executionSignal.managementBreakEvenLockR)
+  )
+    ? Number(executionSignal.managementBreakEvenLockR)
+    : null;
+  execution.managementBreakEvenMinBars = Number.isFinite(
+    Number(executionSignal.managementBreakEvenMinBars)
+  )
+    ? Math.max(1, Math.floor(Number(executionSignal.managementBreakEvenMinBars)))
+    : null;
 
   if (EXECUTION_MODE === "binance_real") {
     if (!hasRealTradeProtectionPathEnabled()) {

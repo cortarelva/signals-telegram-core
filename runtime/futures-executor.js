@@ -23,6 +23,7 @@ const FUTURES_POSITION_MODE = String(process.env.FUTURES_POSITION_MODE || "ONE_W
 const FUTURES_ATTACH_TPSL_ON_ENTRY = String(process.env.FUTURES_ATTACH_TPSL_ON_ENTRY || "0") === "1";
 const FUTURES_TPSL_WORKING_TYPE = String(process.env.FUTURES_TPSL_WORKING_TYPE || "CONTRACT_PRICE");
 const FUTURES_TPSL_PRICE_PROTECT = String(process.env.FUTURES_TPSL_PRICE_PROTECT || "1") === "1";
+const BREAK_EVEN_ENABLED = Number(process.env.BREAK_EVEN_ENABLED || 0) === 1;
 
 
 const FUTURES_RISK_PER_TRADE = Number(process.env.FUTURES_RISK_PER_TRADE || 0.005);
@@ -51,6 +52,10 @@ const ENABLE_TELEGRAM = String(process.env.ENABLE_TELEGRAM || "0") === "1";
 const TELEGRAM_BOT_TOKEN = String(process.env.TELEGRAM_BOT_TOKEN || "");
 const TELEGRAM_CHAT_ID = String(process.env.TELEGRAM_CHAT_ID || "");
 const futuresFiltersCache = new Map();
+
+function hasRealTradeProtectionPathEnabled() {
+  return FUTURES_ATTACH_TPSL_ON_ENTRY || BREAK_EVEN_ENABLED;
+}
 
 function decimalsFromStep(step) {
   const stepStr = String(step || "1");
@@ -2077,6 +2082,14 @@ async function paperExecute(signalObj, state, options = {}) {
   execution.entryPlanned = execution.entry;
 
   if (EXECUTION_MODE === "binance_real") {
+    if (!hasRealTradeProtectionPathEnabled()) {
+      return {
+        executed: false,
+        reason: "futures_protection_disabled",
+        order: null,
+      };
+    }
+
     try {
       execution = await openRealFuturesPosition(execution);
       appendOrderLog({

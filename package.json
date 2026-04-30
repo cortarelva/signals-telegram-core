@@ -47,6 +47,7 @@
     "manifest:compare": "node scripts/compare-repo-manifests.js",
     "hunt:crypto": "node research/run-crypto-strategy-hunt.js",
     "hunt:registry": "node research/build-strategy-hunt-registry.js",
+    "journal:update": "node scripts/update-system-journal.js",
     "lab:btc-gated:start": "bash start-btc-gated-bearish-lab.sh",
     "lab:btc-gated:stop": "bash stop-btc-gated-bearish-lab.sh",
     "lab:btc-gated:status": "bash status-btc-gated-bearish-lab.sh",

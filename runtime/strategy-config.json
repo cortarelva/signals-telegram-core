@@ -621,7 +621,9 @@
       "enabled": false
     },
     "CIPHER_CONTINUATION_SHORT": {
-      "enabled": true
+      "enabled": true,
+      "minScore": 96,
+      "minAdx": 12
     },
     "CIPHER_CONTINUATION_LONG": {
       "enabled": false

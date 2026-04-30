@@ -581,7 +581,6 @@
       "enabled": true,
       "minTpPct": 0.001,
       "srHardBlockReasons": [
-        "too_far_from_support",
         "resistance_too_close"
       ]
     },

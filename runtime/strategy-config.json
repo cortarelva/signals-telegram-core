@@ -111,7 +111,7 @@
       "enabled": false
     },
     "CIPHER_CONTINUATION_SHORT": {
-      "enabled": true,
+      "enabled": false,
       "emaTouchAtr": 0.8
     },
     "TREND": {
@@ -152,7 +152,7 @@
       "enabled": false
     },
     "BREAKDOWN_RETEST_SHORT": {
-      "enabled": true
+      "enabled": false
     },
     "BULL_TRAP": {
       "enabled": false
@@ -164,7 +164,7 @@
       "enabled": true
     },
     "CIPHER_CONTINUATION_SHORT": {
-      "enabled": true,
+      "enabled": false,
       "MANAGEMENT": {
         "breakEvenTriggerR": 0.3,
         "breakEvenLockR": 0.1,
@@ -296,7 +296,7 @@
       "enabled": false
     },
     "CIPHER_CONTINUATION_LONG": {
-      "enabled": true,
+      "enabled": false,
       "minTpPct": 0.001,
       "ema200BufferPct": 0.006,
       "preMacdStructureOverride": {

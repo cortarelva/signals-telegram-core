@@ -13,6 +13,8 @@ PROFILE_NAME="${STRATEGY_HUNT_PROFILE_NAME:-default}"
 LOCK_FILE="${STRATEGY_HUNT_LOCK_FILE:-$ROOT_DIR/runtime/strategy-hunt.lock}"
 LOADAVG_MAX="${STRATEGY_HUNT_LOADAVG_MAX:-2.40}"
 MEM_AVAILABLE_MB_MIN="${STRATEGY_HUNT_MEM_AVAILABLE_MB_MIN:-700}"
+ROTATION_BLOCKS="${STRATEGY_HUNT_ROTATION_BLOCKS:-}"
+ROTATION_STATE_FILE="${STRATEGY_HUNT_ROTATION_STATE_FILE:-$ROOT_DIR/runtime/strategy-hunt-${PROFILE_NAME}-rotation.json}"
 
 LOG_DIR="$ROOT_DIR/logs/strategy-hunt"
 LOG_FILE="$LOG_DIR/strategy-hunt-${PROFILE_NAME}.log"
@@ -55,6 +57,17 @@ fi
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S %Z')] strategy hunt start profile=${PROFILE_NAME} load1m=${CURRENT_LOAD} memAvailableMb=${CURRENT_MEM_MB}"
 cd "$ROOT_DIR"
+
+if [ -n "$ROTATION_BLOCKS" ]; then
+  ROTATION_SYMBOLS="$(node "$ROOT_DIR/runtime/resolve-hunt-rotation.js" \
+    --rotation-blocks "$ROTATION_BLOCKS" \
+    --state-file "$ROTATION_STATE_FILE" \
+    --profile-name "$PROFILE_NAME")"
+  if [ -n "$ROTATION_SYMBOLS" ]; then
+    export STRATEGY_HUNT_SYMBOLS="$ROTATION_SYMBOLS"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S %Z')] strategy hunt profile=${PROFILE_NAME} rotation symbols=${STRATEGY_HUNT_SYMBOLS}"
+  fi
+fi
 
 if command -v ionice >/dev/null 2>&1; then
   HUNT_PREFIX=(ionice -c3 nice -n 10)

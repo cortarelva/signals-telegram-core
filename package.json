@@ -42,6 +42,7 @@
     "factor:btc-context": "node research/analyze-btc-factor-context.js",
     "monte:trades": "node research/monte-carlo-trade-list.js",
     "report:promotion-gates": "node research/build-promotion-gate-report.js",
+    "report:live-management": "node research/live-management-audit.js",
     "predict:next3": "node research/predict-next-3-candles-direction.js",
     "manifest:build": "node scripts/build-repo-manifest.js --output runtime/local-repo-manifest.json",
     "manifest:compare": "node scripts/compare-repo-manifests.js",

@@ -49,6 +49,7 @@
     "manifest:compare": "node scripts/compare-repo-manifests.js",
     "hunt:crypto": "node research/run-crypto-strategy-hunt.js",
     "hunt:registry": "node research/build-strategy-hunt-registry.js",
+    "backfill:binance-public": "node research/backfill-binance-public-data.js",
     "journal:update": "node scripts/update-system-journal.js",
     "lab:btc-gated:start": "bash start-btc-gated-bearish-lab.sh",
     "lab:btc-gated:stop": "bash stop-btc-gated-bearish-lab.sh",

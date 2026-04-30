@@ -67,6 +67,7 @@ const {
   resolveExternalHistoryProvider,
   fetchKlinesFromExternalProvider,
 } = require("./external-history");
+const { readBackfilledSlice } = require("./binance-public-history");
 
 const TF = process.env.TF || "15m";
 const HTF_TF = process.env.HTF_TF || "1d";
@@ -111,6 +112,8 @@ const TREND_MAX_DIST_EMA50_ATR = Number(process.env.TREND_MAX_DIST_EMA50_ATR || 
 const PAPER_MIN_SCORE = Number(process.env.PAPER_MIN_SCORE || 60);
 
 const CACHE_DIR = path.join(__dirname, "cache", "strategy-backtests");
+const BACKTEST_USE_PUBLIC_HISTORY_CACHE =
+  String(process.env.BACKTEST_USE_PUBLIC_HISTORY_CACHE || "0") === "1";
 const DEFAULT_OUTPUT_FILE = process.env.BACKTEST_OUTPUT_FILE
   ? path.resolve(process.cwd(), process.env.BACKTEST_OUTPUT_FILE)
   : path.join(__dirname, "candidate-strategy-backtest.json");
@@ -407,6 +410,19 @@ async function fetchKlines(symbol, interval, total) {
     );
     fs.writeFileSync(file, JSON.stringify(rows, null, 2), "utf8");
     return rows;
+  }
+
+  if (BACKTEST_USE_PUBLIC_HISTORY_CACHE) {
+    const backfilledRows = readBackfilledSlice({
+      symbol,
+      interval,
+      limit: total,
+    });
+
+    if (Array.isArray(backfilledRows) && backfilledRows.length > 0) {
+      fs.writeFileSync(file, JSON.stringify(backfilledRows, null, 2), "utf8");
+      return backfilledRows;
+    }
   }
 
   const limit = 1000;

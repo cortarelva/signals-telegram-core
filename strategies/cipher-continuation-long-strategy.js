@@ -72,6 +72,13 @@ function evaluateCipherContinuationLongStrategy(ctx) {
       cfg.CIPHER_CONTINUATION_LONG_MIN_TP_PCT ??
       0
   );
+  const srEval = ctx?.srEvalLong || ctx?.srEval || null;
+  const srHardBlockReasons = Array.isArray(cipherCfg.srHardBlockReasons)
+    ? cipherCfg.srHardBlockReasons
+        .map((value) => String(value || "").trim())
+        .filter(Boolean)
+    : [];
+  const requireSrPass = cipherCfg.requireSrPass === true;
   const preMacdStructureOverrideCfg =
     cipherCfg.preMacdStructureOverride || {};
   const preMacdStructureOverrideEnabled =
@@ -252,6 +259,14 @@ function evaluateCipherContinuationLongStrategy(ctx) {
   const plannedRr = helpers.safeRatio(reward, risk);
   const tpPctAfterCap = entry > 0 ? reward / entry : null;
   const validRiskShape = hasValidLongRiskShape(entry, sl, tp);
+  const srHardBlocked =
+    srHardBlockReasons.length > 0 &&
+    srEval &&
+    srHardBlockReasons.includes(String(srEval.reason || ""));
+  const srRequiredBlocked =
+    requireSrPass &&
+    srEval &&
+    srEval.passed === false;
   const preMacdStructureOverridePullbackZoneOk =
     pullbackTouchesEma20 || pullbackNearBbBasis;
   const preMacdStructureOverrideSignalVolRatioOk =
@@ -282,6 +297,8 @@ function evaluateCipherContinuationLongStrategy(ctx) {
     bullishSignal &&
     adx >= preMacdStructureOverrideMinAdx &&
     validRiskShape &&
+    !srHardBlocked &&
+    !srRequiredBlocked &&
     signalClass === "EXECUTABLE" &&
     Number.isFinite(plannedRr) &&
     plannedRr >= preMacdStructureOverrideMinRr &&
@@ -304,6 +321,8 @@ function evaluateCipherContinuationLongStrategy(ctx) {
     bullishSignal &&
     adx >= minAdx &&
     validRiskShape &&
+    !srHardBlocked &&
+    !srRequiredBlocked &&
     signalClass === "EXECUTABLE" &&
     Number.isFinite(plannedRr) &&
     plannedRr >= minPlannedRr;
@@ -319,6 +338,10 @@ function evaluateCipherContinuationLongStrategy(ctx) {
       reason = "cipherContinuationLong:pullback_not_in_zone";
     } else if (!pullbackStaysAboveEma50) {
       reason = "cipherContinuationLong:pullback_too_deep";
+    } else if (srHardBlocked) {
+      reason = `cipherContinuationLong:${String(srEval?.reason || "sr_hard_blocked")}`;
+    } else if (srRequiredBlocked) {
+      reason = `cipherContinuationLong:${String(srEval?.reason || "sr_required_failed")}`;
     } else if (!macdReaccelerating) {
       reason = "cipherContinuationLong:macd_not_reaccelerating";
     } else if (!bullishSignal) {
@@ -363,6 +386,12 @@ function evaluateCipherContinuationLongStrategy(ctx) {
         signalVolRatio,
         plannedRr,
         validRiskShape,
+        srPassed: srEval?.passed ?? null,
+        srReason: srEval?.reason ?? null,
+        srHardBlockReasons,
+        srHardBlocked,
+        requireSrPass,
+        srRequiredBlocked,
         preMacdStructureOverrideEnabled,
         preMacdStructureOverrideAllowed,
         preMacdStructureOverrideMinRr,
@@ -417,6 +446,12 @@ function evaluateCipherContinuationLongStrategy(ctx) {
         plannedRr,
         tpPctAfterCap,
         validRiskShape,
+        srPassed: srEval?.passed ?? null,
+        srReason: srEval?.reason ?? null,
+        srHardBlockReasons,
+        srHardBlocked,
+        requireSrPass,
+        srRequiredBlocked,
         preMacdStructureOverrideEnabled,
         preMacdStructureOverrideAllowed,
       },
@@ -458,6 +493,12 @@ function evaluateCipherContinuationLongStrategy(ctx) {
         plannedRr,
         tpPctAfterCap,
         validRiskShape,
+        srPassed: srEval?.passed ?? null,
+        srReason: srEval?.reason ?? null,
+        srHardBlockReasons,
+        srHardBlocked,
+        requireSrPass,
+        srRequiredBlocked,
         preMacdStructureOverrideEnabled,
         preMacdStructureOverrideAllowed,
       },
@@ -501,6 +542,12 @@ function evaluateCipherContinuationLongStrategy(ctx) {
         tpPctAfterCap,
         minTpPct,
         validRiskShape,
+        srPassed: srEval?.passed ?? null,
+        srReason: srEval?.reason ?? null,
+        srHardBlockReasons,
+        srHardBlocked,
+        requireSrPass,
+        srRequiredBlocked,
         preMacdStructureOverrideEnabled,
         preMacdStructureOverrideAllowed,
       },
@@ -546,6 +593,12 @@ function evaluateCipherContinuationLongStrategy(ctx) {
       tpPctAfterCap,
       minTpPct,
       validRiskShape,
+      srPassed: srEval?.passed ?? null,
+      srReason: srEval?.reason ?? null,
+      srHardBlockReasons,
+      srHardBlocked,
+      requireSrPass,
+      srRequiredBlocked,
       preMacdStructureOverrideEnabled,
       preMacdStructureOverrideAllowed,
       preMacdStructureOverrideMinRr,

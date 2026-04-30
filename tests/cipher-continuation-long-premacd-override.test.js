@@ -86,6 +86,10 @@ function makeContext(cipherCfg = {}) {
     helpers: makeHelpers(),
     candles: makeLongCandles(),
     nearestResistance: { price: 102.5 },
+    srEval: {
+      passed: true,
+      reason: "ok",
+    },
     indicators: {
       entry: 100.05,
       atr: 1,
@@ -109,6 +113,10 @@ function makeTightTargetContext(cipherCfg = {}) {
     helpers: makeHelpers(),
     candles: makeLongCandles(),
     nearestResistance: { price: 102.5 },
+    srEval: {
+      passed: true,
+      reason: "ok",
+    },
     indicators: {
       entry: 100.005,
       atr: 0.05,
@@ -180,4 +188,51 @@ test("cipherContinuationLong blocks tiny pre-MACD targets with minTpPct floor", 
   assert.equal(result.reason, "cipherContinuationLong:tp_pct_too_small");
   assert.equal(result.meta.preMacdStructureOverrideAllowed, true);
   assert.ok(result.meta.tpPctAfterCap < result.meta.minTpPct);
+});
+
+test("cipherContinuationLong ignores SR by default but can hard-block configured SR reasons", () => {
+  const allowedByDefault = evaluateCipherContinuationLongStrategy(
+    makeContext({
+      preMacdStructureOverride: {
+        enabled: true,
+        minRr: 0.6,
+        minAdx: 8,
+        minRsi: 49,
+        maxExtensionAtr: 0.1,
+        maxSignalVolRatio: 0.9,
+        requireBullishStack: true,
+        requirePullbackTouchesEma20: true,
+        requirePullbackNearBbBasis: true,
+        requirePullbackStaysAboveEma50: true,
+      },
+    })
+  );
+
+  assert.equal(allowedByDefault.allowed, true);
+
+  const srBlocked = evaluateCipherContinuationLongStrategy({
+    ...makeContext({
+      srHardBlockReasons: ["resistance_too_close"],
+      preMacdStructureOverride: {
+        enabled: true,
+        minRr: 0.6,
+        minAdx: 8,
+        minRsi: 49,
+        maxExtensionAtr: 0.1,
+        maxSignalVolRatio: 0.9,
+        requireBullishStack: true,
+        requirePullbackTouchesEma20: true,
+        requirePullbackNearBbBasis: true,
+        requirePullbackStaysAboveEma50: true,
+      },
+    }),
+    srEval: {
+      passed: false,
+      reason: "resistance_too_close",
+    },
+  });
+
+  assert.equal(srBlocked.allowed, false);
+  assert.equal(srBlocked.reason, "cipherContinuationLong:resistance_too_close");
+  assert.equal(srBlocked.meta.srHardBlocked, true);
 });

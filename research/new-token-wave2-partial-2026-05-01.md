@@ -199,6 +199,58 @@ Read:
 - `FETUSDT` also deserves more respect than expected, especially `bullTrap`
 - `UNI` and `INJ` are still more secondary than primary
 
+## Monte Carlo follow-up on the best `1h` extension lanes
+
+### `ATOMUSDT 1h bullTrap`
+
+- `22` trades
+- `avgNet +0.6230%`
+- `PF 2.309`
+- bootstrap `p05 avgNet = +0.0380%`
+- bootstrap `p05 PF = 1.065`
+- shuffled-order `p95 maxDD = 5.9412%`
+- recommendation: `exploratory`
+
+Read:
+
+- strongest `ATOM` lane so far
+- lower bound stayed positive
+- drawdown stress stayed under control
+- still not auto-promoted by the current Monte Carlo classifier, but this is one of the cleanest exploratory candidates found outside the original universe
+
+### `ATOMUSDT 1h cipherContinuationLong`
+
+- `18` trades
+- `avgNet +0.5822%`
+- `PF 1.850`
+- bootstrap `p05 avgNet = -0.1928%`
+- bootstrap `p05 PF = 0.829`
+- shuffled-order `p95 maxDD = 8.4631%`
+- recommendation: `exploratory`
+
+Read:
+
+- point estimate remains attractive
+- lower-bound fragility is meaningfully worse than `ATOM bullTrap`
+- worth keeping, but behind the `bullTrap` lane in priority
+
+### `FETUSDT 1h bullTrap`
+
+- `16` trades
+- `avgNet +1.0525%`
+- `PF 2.610`
+- bootstrap `p05 avgNet = +0.0582%`
+- bootstrap `p05 PF = 1.052`
+- shuffled-order `p95 maxDD = 7.3409%`
+- recommendation: `exploratory`
+
+Read:
+
+- this is the highest raw edge of the extension set
+- sample is still smaller than `ATOM`
+- but the lower bound stayed positive, which matters a lot
+- this deserves to stand beside `ATOM bullTrap` near the top of the lab queue
+
 ## Execution note on `15m`
 
 - a full long-history `15m` hunt across four symbols and all strategy families was too expensive for the information gained
@@ -212,9 +264,8 @@ Read:
 - `OPUSDT` is the first genuinely interesting symbol of wave 2
 - the `15m cipherContinuationLong` lane deserves sustained attention
 - `ATOMUSDT` is now the strongest new `1h` surprise after the wave 2 extension
+- `FETUSDT 1h bullTrap` also upgraded itself from curiosity to serious exploratory candidate
 - `APTUSDT` is not dead, but still reads more like lab material than promotion-ready edge
 - next:
-  - `Monte Carlo` on `ATOMUSDT 1h bullTrap`
-  - `Monte Carlo` on `ATOMUSDT 1h cipherContinuationLong`
-  - `Monte Carlo` on `FETUSDT 1h bullTrap`
+  - compare `AVAX`, `ATOM`, `FET`, `OP` under one promotion-style shortlist
   - `15m` reruns in smaller focused chunks

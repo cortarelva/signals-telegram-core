@@ -1,0 +1,295 @@
+const fs = require("fs");
+const path = require("path");
+const { parse } = require("csv-parse/sync");
+const { RandomForestClassifier } = require("ml-random-forest");
+
+const CSV_FILE = path.join(__dirname, "consolidated-trades.csv");
+const MODEL_FILE = path.join(__dirname, "signal-model.json");
+const META_FILE = path.join(__dirname, "signal-model-meta.json");
+
+// Features permitidas: só dados conhecidos antes da entrada
+const FEATURE_COLUMNS = [
+  "symbol",
+  "tf",
+  "score",
+  "rsi",
+  "prevRsi",
+  "rsiDelta",
+  "atr",
+  "atrPct",
+  "adx",
+  "ema20",
+  "ema50",
+  "ema200",
+  "bullish",
+  "bullishFast",
+  "nearEma20",
+  "nearEma50",
+  "nearPullback",
+  "stackedEma",
+  "rsiInBand",
+  "rsiRising",
+  "isTrend",
+  "isRange",
+  "emaSeparationPct",
+  "emaSlopePct",
+  "distToEma20",
+  "distToEma50",
+  "distToEma20Atr",
+  "distToEma50Atr",
+  "priceAboveEma20",
+  "priceAboveEma50",
+  "priceAboveEma200",
+  "rrPlanned",
+];
+
+function toNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function toBoolNumber(value) {
+  if (value === true || value === "true" || value === "TRUE") return 1;
+  if (value === false || value === "false" || value === "FALSE") return 0;
+  return null;
+}
+
+function enrichRow(row) {
+  const rsi = toNumber(row.rsi);
+  const prevRsi = toNumber(row.prevRsi);
+  const atr = toNumber(row.atr);
+  const distToEma20 = toNumber(row.distToEma20);
+  const distToEma50 = toNumber(row.distToEma50);
+  const ema20 = toNumber(row.ema20);
+  const ema50 = toNumber(row.ema50);
+  const ema200 = toNumber(row.ema200);
+  const entry = toNumber(row.entryFill ?? row.entry);
+
+  return {
+    ...row,
+    rsiDelta:
+      rsi !== null && prevRsi !== null ? rsi - prevRsi : null,
+    distToEma20Atr:
+      atr !== null && atr > 0 && distToEma20 !== null ? distToEma20 / atr : null,
+    distToEma50Atr:
+      atr !== null && atr > 0 && distToEma50 !== null ? distToEma50 / atr : null,
+    priceAboveEma20:
+      entry !== null && ema20 !== null ? (entry > ema20 ? 1 : 0) : null,
+    priceAboveEma50:
+      entry !== null && ema50 !== null ? (entry > ema50 ? 1 : 0) : null,
+    priceAboveEma200:
+      entry !== null && ema200 !== null ? (entry > ema200 ? 1 : 0) : null,
+  };
+}
+
+function shuffle(array) {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function trainTestSplit(rows, testRatio = 0.25) {
+  const shuffled = shuffle(rows);
+  const testSize = Math.floor(shuffled.length * testRatio);
+  return {
+    test: shuffled.slice(0, testSize),
+    train: shuffled.slice(testSize),
+  };
+}
+
+function buildCategoryMap(rows, column) {
+  const values = new Set();
+  for (const row of rows) {
+    const v = row[column];
+    if (v !== null && v !== undefined && v !== "") values.add(String(v));
+  }
+  return Array.from(values).sort();
+}
+
+function buildEncoders(rows) {
+  return {
+    symbol: buildCategoryMap(rows, "symbol"),
+    tf: buildCategoryMap(rows, "tf"),
+  };
+}
+
+function oneHot(value, categories) {
+  const arr = new Array(categories.length).fill(0);
+  const idx = categories.indexOf(String(value));
+  if (idx >= 0) arr[idx] = 1;
+  return arr;
+}
+
+function encodeRow(row, encoders) {
+  const boolCols = new Set([
+    "bullish",
+    "bullishFast",
+    "nearEma20",
+    "nearEma50",
+    "nearPullback",
+    "stackedEma",
+    "rsiInBand",
+    "rsiRising",
+    "isTrend",
+    "isRange",
+  ]);
+
+  const categoricalCols = new Set(["symbol", "tf"]);
+
+  const vector = [];
+
+  for (const col of FEATURE_COLUMNS) {
+    if (categoricalCols.has(col)) {
+      vector.push(...oneHot(row[col], encoders[col]));
+      continue;
+    }
+
+    if (boolCols.has(col)) {
+      const v = toBoolNumber(row[col]);
+      vector.push(v ?? 0);
+      continue;
+    }
+
+    const v = toNumber(row[col]);
+    vector.push(v ?? 0);
+  }
+
+  return vector;
+}
+
+function loadRows() {
+  const csv = fs.readFileSync(CSV_FILE, "utf8");
+  const rows = parse(csv, {
+    columns: true,
+    skip_empty_lines: true,
+  });
+
+  return rows
+    .map((row) => {
+      const pnlPct = toNumber(row.pnlPct);
+      if (pnlPct === null) return null;
+
+      return enrichRow({
+        ...row,
+        target: pnlPct > 0 ? 1 : 0,
+      });
+    })
+    .filter(Boolean);
+}
+
+function evaluate(yTrue, yPred) {
+  let tp = 0;
+  let tn = 0;
+  let fp = 0;
+  let fn = 0;
+
+  for (let i = 0; i < yTrue.length; i++) {
+    const a = yTrue[i];
+    const b = yPred[i];
+
+    if (a === 1 && b === 1) tp++;
+    else if (a === 0 && b === 0) tn++;
+    else if (a === 0 && b === 1) fp++;
+    else if (a === 1 && b === 0) fn++;
+  }
+
+  const accuracy = (tp + tn) / Math.max(1, yTrue.length);
+  const precision = tp / Math.max(1, tp + fp);
+  const recall = tp / Math.max(1, tp + fn);
+  const f1 =
+    (2 * precision * recall) / Math.max(1e-9, precision + recall);
+
+  return {
+    tp,
+    tn,
+    fp,
+    fn,
+    accuracy,
+    precision,
+    recall,
+    f1,
+  };
+}
+
+function main() {
+  if (!fs.existsSync(CSV_FILE)) {
+    throw new Error(`CSV não encontrado: ${CSV_FILE}`);
+  }
+
+  const rows = loadRows();
+
+  if (rows.length < 30) {
+    throw new Error(`Poucos dados para treino: ${rows.length}`);
+  }
+
+  const { train, test } = trainTestSplit(rows, 0.25);
+  const encoders = buildEncoders(train);
+
+  const Xtrain = train.map((r) => encodeRow(r, encoders));
+  const ytrain = train.map((r) => r.target);
+
+  const Xtest = test.map((r) => encodeRow(r, encoders));
+  const ytest = test.map((r) => r.target);
+
+  const rf = new RandomForestClassifier({
+    nEstimators: 200,
+    maxFeatures: Math.max(1, Math.floor(Math.sqrt(Xtrain[0].length))),
+    replacement: true,
+    seed: 42,
+    treeOptions: {
+      maxDepth: 8,
+      minNumSamples: 5,
+    },
+  });
+
+  rf.train(Xtrain, ytrain);
+
+  const ypred = rf.predict(Xtest);
+  const metrics = evaluate(ytest, ypred);
+
+  console.log("\n=== RESULTADOS ===");
+  console.log(`Train rows: ${train.length}`);
+  console.log(`Test rows:  ${test.length}`);
+  console.log(`Accuracy:   ${metrics.accuracy.toFixed(4)}`);
+  console.log(`Precision:  ${metrics.precision.toFixed(4)}`);
+  console.log(`Recall:     ${metrics.recall.toFixed(4)}`);
+  console.log(`F1:         ${metrics.f1.toFixed(4)}`);
+  console.log(
+    `Confusion:  TP=${metrics.tp} TN=${metrics.tn} FP=${metrics.fp} FN=${metrics.fn}`
+  );
+
+  const payload = {
+    modelType: "RandomForestClassifier",
+    featureColumns: FEATURE_COLUMNS,
+    encoders,
+    model: rf.toJSON(),
+    metrics,
+    rowsTotal: rows.length,
+    rowsTrain: train.length,
+    rowsTest: test.length,
+  };
+
+  fs.writeFileSync(MODEL_FILE, JSON.stringify(payload, null, 2), "utf8");
+  fs.writeFileSync(
+    META_FILE,
+    JSON.stringify(
+      {
+        featureColumns: FEATURE_COLUMNS,
+        encoders,
+        metrics,
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+
+  console.log(`\nModelo guardado em: ${MODEL_FILE}`);
+  console.log(`Meta guardada em:   ${META_FILE}`);
+}
+
+main();

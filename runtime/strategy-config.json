@@ -1,0 +1,928 @@
+{
+  "DEFAULTS": {
+    "BREAKDOWN_RETEST_SHORT": {
+      "enabled": false
+    },
+    "BULL_TRAP": {
+      "enabled": false
+    },
+    "FAILED_BREAKDOWN": {
+      "enabled": false
+    },
+    "MOMENTUM_BREAKOUT_LONG": {
+      "enabled": false
+    },
+    "IGNITION_CONTINUATION_LONG": {
+      "enabled": false,
+      "minScore": 63,
+      "minAdx": 8,
+      "trendMode": "soft",
+      "ema200BufferPct": 0.0035,
+      "impulseLookback": 6,
+      "pauseBars": 3,
+      "minImpulseAtr": 0.95,
+      "minImpulsePct": 0.0035,
+      "minImpulseVolRatio": 1.05,
+      "maxPauseRangeAtr": 0.95,
+      "maxPauseRetraceFrac": 0.45,
+      "maxPauseBelowEma20Atr": 0.2,
+      "breakoutBufferAtr": 0.04,
+      "maxExtensionAtr": 2.6,
+      "maxBreakoutAboveBbAtr": 0.55,
+      "minSignalVolRatio": 0.95,
+      "maxSignalVolRatio": 4.6,
+      "minCloseLocation": 0.55,
+      "requireTrendRegime": false,
+      "requireHtfBullish": false,
+      "requireLtfBullishShift": false,
+      "minEmaSeparationPct": 0,
+      "minAtrPct": 0,
+      "slAtrMult": 0.85,
+      "tpAtrMult": 1.75,
+      "minPlannedRr": 0.65,
+      "tpResistanceBufferAtr": 0.18,
+      "minRrAfterCap": 0.75,
+      "minTpPctAfterCap": 0.0012
+    },
+    "CIPHER_CONTINUATION_SHORT": {
+      "enabled": false,
+      "trendMode": "soft",
+      "minScore": 92,
+      "minAdx": 10,
+      "minSignalVolRatio": 1,
+      "maxSignalVolRatio": 3.5,
+      "pullbackBars": 5,
+      "ema200BufferPct": 0.0035,
+      "maxExtensionAtr": 1.8,
+      "emaTouchAtr": 0.65,
+      "maxPullbackAboveEma50Atr": 0.6,
+      "bbStdDev": 2,
+      "minPlannedRr": 0.65,
+      "slAtrMult": 1,
+      "tpAtrMult": 1.8,
+      "tpSupportBufferAtr": 0.18,
+      "minRrAfterCap": 0.8,
+      "minTpPctAfterCap": 0.0012
+    },
+    "CIPHER_CONTINUATION_LONG": {
+      "enabled": false,
+      "trendMode": "soft",
+      "minScore": 64,
+      "minAdx": 8,
+      "minSignalVolRatio": 1,
+      "maxSignalVolRatio": 3.5,
+      "pullbackBars": 5,
+      "ema200BufferPct": 0.0035,
+      "maxExtensionAtr": 1.8,
+      "emaTouchAtr": 0.8,
+      "maxPullbackBelowEma50Atr": 0.6,
+      "bbStdDev": 2,
+      "minPlannedRr": 0.55,
+      "slAtrMult": 1,
+      "tpAtrMult": 1.8,
+      "tpResistanceBufferAtr": 0.18,
+      "minRrAfterCap": 0.8,
+      "minTpPctAfterCap": 0.0012
+    },
+    "BREAKDOWN_CONTINUATION_BASE_SHORT": {
+      "enabled": false
+    }
+  },
+  "ETHUSDC": {
+    "TF": "1h",
+    "HTF_TF": "1d",
+    "RSI_MIN": 35,
+    "RSI_MAX": 55,
+    "SL_ATR_MULT": 0.75,
+    "TP_ATR_MULT": 3,
+    "PULLBACK_BAND_ATR": 0.6,
+    "REQUIRE_SR": true,
+    "MIN_SPACE_TO_TARGET_ATR": 0.8,
+    "MAX_DISTANCE_FROM_SUPPORT_ATR": 1.2,
+    "TP_RESISTANCE_BUFFER_ATR": 0.15,
+    "REQUIRE_TREND": false,
+    "MIN_RR_PLANNED": 0.8,
+    "MIN_RR_AFTER_CAP": 0.03,
+    "TREND_REQUIRE_RSI_FALLING": true,
+    "OVERSOLD_BOUNCE": {
+      "enabled": false
+    },
+    "BULL_TRAP": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_SHORT": {
+      "enabled": false,
+      "emaTouchAtr": 0.8
+    },
+    "TREND": {
+      "enabled": false,
+      "allow15m": true,
+      "requireRsiFalling": false
+    },
+    "TREND_SHORT": {
+      "enabled": false,
+      "minScore": 66,
+      "minAdx": 16,
+      "rsiMin": 38,
+      "rsiMax": 52,
+      "requireSr": true,
+      "requireNearPullback": true,
+      "requireRsiFalling": true,
+      "maxPullbackPct": 0.03
+    },
+    "ENABLED": true
+  },
+  "BTCUSDC": {
+    "TF": "1h",
+    "HTF_TF": "1d",
+    "RSI_MIN": 35,
+    "RSI_MAX": 55,
+    "SL_ATR_MULT": 0.75,
+    "TP_ATR_MULT": 3,
+    "PULLBACK_BAND_ATR": 0.6,
+    "REQUIRE_SR": true,
+    "MIN_SPACE_TO_TARGET_ATR": 0.8,
+    "MAX_DISTANCE_FROM_SUPPORT_ATR": 1.2,
+    "TP_RESISTANCE_BUFFER_ATR": 0.15,
+    "REQUIRE_TREND": false,
+    "MIN_RR_PLANNED": 0.8,
+    "MIN_RR_AFTER_CAP": 0.03,
+    "TREND_REQUIRE_RSI_FALLING": true,
+    "OVERSOLD_BOUNCE": {
+      "enabled": false
+    },
+    "BREAKDOWN_RETEST_SHORT": {
+      "enabled": false
+    },
+    "BULL_TRAP": {
+      "enabled": false
+    },
+    "FAILED_BREAKDOWN": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_LONG": {
+      "enabled": true
+    },
+    "CIPHER_CONTINUATION_SHORT": {
+      "enabled": false,
+      "MANAGEMENT": {
+        "breakEvenTriggerR": 0.3,
+        "breakEvenLockR": 0.1,
+        "breakEvenMinBars": 1
+      }
+    },
+    "TREND": {
+      "enabled": false
+    },
+    "TREND_SHORT": {
+      "enabled": false
+    },
+    "MOMENTUM_BREAKOUT_LONG": {
+      "enabled": false,
+      "minScore": 55,
+      "minAdx": 4,
+      "minBodyAtr": 0.12,
+      "minBreakoutCloseAtr": 0.03,
+      "maxBaseRangeAtr": 3.5,
+      "minBaseTightnessAtr": 0.2,
+      "maxBaseDriftAtr": 2,
+      "maxDistanceAboveEma20Atr": 2,
+      "minRelativeVolume": 1,
+      "minRsi": 50,
+      "maxRsi": 78,
+      "minRsiRecovery": 0.1,
+      "requireAboveEma20": true,
+      "requireAboveEma50": false,
+      "requireBullishFast": false,
+      "tpAtrMult": 1.7,
+      "minPlannedRr": 0.7
+    },
+    "EXTRA_RUNS": [
+      {
+        "id": "btc_bdcb_15m_exploratory",
+        "ENABLED": false,
+        "TF": "15m",
+        "HTF_TF": "1d",
+        "BREAKDOWN_RETEST_SHORT": {
+          "enabled": false
+        },
+        "CIPHER_CONTINUATION_LONG": {
+          "enabled": false
+        },
+        "CIPHER_CONTINUATION_SHORT": {
+          "enabled": false
+        },
+        "BREAKDOWN_CONTINUATION_BASE_SHORT": {
+          "enabled": true,
+          "maxBaseRecoveryFrac": 0.6,
+          "maxBaseCloseRecoveryFrac": 0.5,
+          "EXECUTION": {
+            "bucket": "exploratory",
+            "riskPerTrade": 0.0025,
+            "maxPositionUsd": 25,
+            "maxPortfolioNotionalUsd": 50,
+            "maxSideNotionalUsd": 50,
+            "maxPortfolioRiskUsd": 0.5,
+            "maxSideRiskUsd": 0.5,
+            "maxRollingNetLossUsd": 0.75,
+            "rollingLossLookbackHours": 24,
+            "maxConsecutiveLosses": 2,
+            "lossStreakCooldownMins": 180
+          }
+        }
+      }
+    ],
+    "ENABLED": true
+  },
+  "BNBUSDC": {
+    "RSI_MIN": 35,
+    "RSI_MAX": 55,
+    "SL_ATR_MULT": 0.8,
+    "TP_ATR_MULT": 3,
+    "PULLBACK_BAND_ATR": 0.6,
+    "REQUIRE_SR": true,
+    "MIN_SPACE_TO_TARGET_ATR": 1,
+    "MAX_DISTANCE_FROM_SUPPORT_ATR": 1.2,
+    "TP_RESISTANCE_BUFFER_ATR": 0.15,
+    "REQUIRE_TREND": false,
+    "MIN_RR_PLANNED": 0.8,
+    "MIN_RR_AFTER_CAP": 0.03,
+    "TREND_REQUIRE_RSI_FALLING": true,
+    "OVERSOLD_BOUNCE": {
+      "enabled": false
+    },
+    "BREAKDOWN_RETEST_SHORT": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_SHORT": {
+      "enabled": false
+    },
+    "TREND": {
+      "enabled": false
+    },
+    "TREND_SHORT": {
+      "enabled": false,
+      "minScore": 64,
+      "minAdx": 14,
+      "rsiMin": 38,
+      "rsiMax": 54,
+      "requireSr": true,
+      "requireNearPullback": true,
+      "requireRsiFalling": true,
+      "maxPullbackPct": 0.035
+    },
+    "ENABLED": false
+  },
+  "ADAUSDC": {
+    "TF": "5m",
+    "HTF_TF": "1d",
+    "RSI_MIN": 35,
+    "RSI_MAX": 55,
+    "SL_ATR_MULT": 0.75,
+    "TP_ATR_MULT": 3,
+    "PULLBACK_BAND_ATR": 0.6,
+    "REQUIRE_SR": true,
+    "MIN_SPACE_TO_TARGET_ATR": 0.8,
+    "MAX_DISTANCE_FROM_SUPPORT_ATR": 1.2,
+    "TP_RESISTANCE_BUFFER_ATR": 0.15,
+    "REQUIRE_TREND": false,
+    "MIN_RR_PLANNED": 0.8,
+    "MIN_RR_AFTER_CAP": 0.03,
+    "TREND_REQUIRE_RSI_FALLING": true,
+    "BREAKDOWN_RETEST_SHORT": {
+      "enabled": false
+    },
+    "FAILED_BREAKDOWN": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_LONG": {
+      "enabled": false,
+      "minTpPct": 0.001,
+      "ema200BufferPct": 0.006,
+      "preMacdStructureOverride": {
+        "enabled": true,
+        "minRr": 0.6,
+        "minAdx": 8,
+        "minRsi": 49,
+        "maxExtensionAtr": 0.1,
+        "maxSignalVolRatio": 0.9,
+        "requireBullishStack": true,
+        "requirePullbackTouchesEma20": true,
+        "requirePullbackNearBbBasis": true,
+        "requirePullbackStaysAboveEma50": true
+      }
+    },
+    "TREND": {
+      "enabled": false,
+      "allow15m": false,
+      "minScore": 55,
+      "minAdx": 12,
+      "rsiMin": 40,
+      "rsiMax": 60,
+      "requireSr": true,
+      "requireNearPullback": true,
+      "requireRsiFalling": false
+    },
+    "TREND_SHORT": {
+      "enabled": false,
+      "minScore": 70,
+      "minAdx": 16,
+      "rsiMin": 39,
+      "rsiMax": 52,
+      "requireSr": true,
+      "requireNearPullback": true,
+      "requireRsiFalling": true,
+      "maxPullbackPct": 0.03
+    },
+    "EXTRA_RUNS": [
+      {
+        "id": "ada_bdcb_15m_exploratory",
+        "ENABLED": false,
+        "TF": "15m",
+        "HTF_TF": "1d",
+        "CIPHER_CONTINUATION_LONG": {
+          "enabled": false
+        },
+        "BREAKDOWN_CONTINUATION_BASE_SHORT": {
+          "enabled": true,
+          "maxBaseRecoveryFrac": 0.6,
+          "maxBaseCloseRecoveryFrac": 0.5,
+          "EXECUTION": {
+            "bucket": "exploratory",
+            "riskPerTrade": 0.0025,
+            "maxPositionUsd": 25,
+            "maxPortfolioNotionalUsd": 50,
+            "maxSideNotionalUsd": 50,
+            "maxPortfolioRiskUsd": 0.5,
+            "maxSideRiskUsd": 0.5,
+            "maxRollingNetLossUsd": 0.75,
+            "rollingLossLookbackHours": 24,
+            "maxConsecutiveLosses": 2,
+            "lossStreakCooldownMins": 180
+          }
+        }
+      }
+    ],
+    "ENABLED": true
+  },
+  "XRPUSDC": {
+    "TF": "1h",
+    "HTF_TF": "1d",
+    "RSI_MIN": 35,
+    "RSI_MAX": 55,
+    "SL_ATR_MULT": 0.75,
+    "TP_ATR_MULT": 3,
+    "PULLBACK_BAND_ATR": 0.6,
+    "REQUIRE_SR": true,
+    "MIN_SPACE_TO_TARGET_ATR": 0.8,
+    "MAX_DISTANCE_FROM_SUPPORT_ATR": 1.2,
+    "TP_RESISTANCE_BUFFER_ATR": 0.15,
+    "REQUIRE_TREND": false,
+    "MIN_RR_PLANNED": 0.8,
+    "MIN_RR_AFTER_CAP": 0.03,
+    "TREND_REQUIRE_RSI_FALLING": true,
+    "OVERSOLD_BOUNCE": {
+      "enabled": false
+    },
+    "BREAKDOWN_RETEST_SHORT": {
+      "enabled": false
+    },
+    "BULL_TRAP": {
+      "enabled": false
+    },
+    "FAILED_BREAKDOWN": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_LONG": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_SHORT": {
+      "enabled": false
+    },
+    "MOMENTUM_BREAKOUT_LONG": {
+      "enabled": false
+    },
+    "IGNITION_CONTINUATION_LONG": {
+      "enabled": false,
+      "minScore": 55,
+      "minImpulseAtr": 0.55,
+      "minImpulsePct": 0.002,
+      "minImpulseVolRatio": 0.9,
+      "maxPauseRangeAtr": 1.35,
+      "maxPauseRetraceFrac": 0.72,
+      "maxPauseBelowEma20Atr": 0.55,
+      "breakoutBufferAtr": 0,
+      "maxExtensionAtr": 3.5,
+      "maxBreakoutAboveBbAtr": 1.4,
+      "minSignalVolRatio": 0.7,
+      "maxSignalVolRatio": 6.5,
+      "minCloseLocation": 0.45,
+      "minPlannedRr": 0.5,
+      "minAdx": 6,
+      "requireLtfBullishShift": true
+    },
+    "LIQUIDITY_SWEEP_RECLAIM_LONG": {
+      "enabled": true
+    },
+    "TREND": {
+      "enabled": false
+    },
+    "TREND_SHORT": {
+      "enabled": false,
+      "minScore": 78,
+      "minAdx": 20,
+      "rsiMin": 40,
+      "rsiMax": 52,
+      "requireSr": true,
+      "requireNearPullback": true,
+      "requireRsiFalling": true,
+      "maxPullbackPct": 0.025
+    },
+    "ENABLED": false
+  },
+  "XAUUSDT": {
+    "TF": "1h",
+    "HTF_TF": "1d",
+    "RSI_MIN": 35,
+    "RSI_MAX": 55,
+    "SL_ATR_MULT": 0.75,
+    "TP_ATR_MULT": 3,
+    "PULLBACK_BAND_ATR": 0.6,
+    "REQUIRE_SR": true,
+    "MIN_SPACE_TO_TARGET_ATR": 0.8,
+    "MAX_DISTANCE_FROM_SUPPORT_ATR": 1.2,
+    "TP_RESISTANCE_BUFFER_ATR": 0.15,
+    "REQUIRE_TREND": false,
+    "MIN_RR_PLANNED": 0.8,
+    "MIN_RR_AFTER_CAP": 0.6,
+    "TREND": {
+      "enabled": false,
+      "allow15m": false
+    },
+    "TREND_SHORT": {
+      "enabled": false
+    },
+    "BULL_TRAP": {
+      "enabled": true,
+      "minScore": 56,
+      "minAdx": 4,
+      "maxAdx": 40,
+      "minBreakAtr": 0.03,
+      "minRejectionBodyAtr": 0.05,
+      "minUpperWickAtr": 0.07,
+      "minRsiFade": 0.2,
+      "maxRsiAfterReject": 68,
+      "requireVolume": false,
+      "minRelativeVolume": 0.9,
+      "tpAtrMult": 1.45,
+      "minRrAfterCap": 0.6,
+      "minTpPctAfterCap": 0.0007
+    },
+    "BREAKDOWN_RETEST_SHORT": {
+      "enabled": false
+    },
+    "ENABLED": false
+  },
+  "SOLUSDC": {
+    "RSI_MIN": 35,
+    "RSI_MAX": 55,
+    "SL_ATR_MULT": 0.75,
+    "TP_ATR_MULT": 3,
+    "PULLBACK_BAND_ATR": 0.6,
+    "REQUIRE_SR": true,
+    "MIN_SPACE_TO_TARGET_ATR": 0.8,
+    "MAX_DISTANCE_FROM_SUPPORT_ATR": 1.2,
+    "TP_RESISTANCE_BUFFER_ATR": 0.15,
+    "REQUIRE_TREND": false,
+    "MIN_RR_PLANNED": 0.8,
+    "MIN_RR_AFTER_CAP": 0.03,
+    "TREND_REQUIRE_RSI_FALLING": true,
+    "BULL_TRAP": {
+      "enabled": false
+    },
+    "BREAKDOWN_RETEST_SHORT": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_LONG": {
+      "enabled": false
+    },
+    "IGNITION_CONTINUATION_LONG": {
+      "enabled": false,
+      "minScore": 55,
+      "minImpulseAtr": 0.55,
+      "minImpulsePct": 0.002,
+      "minImpulseVolRatio": 0.9,
+      "maxPauseRangeAtr": 1.35,
+      "maxPauseRetraceFrac": 0.72,
+      "maxPauseBelowEma20Atr": 0.55,
+      "breakoutBufferAtr": 0,
+      "maxExtensionAtr": 3.5,
+      "maxBreakoutAboveBbAtr": 1.4,
+      "minSignalVolRatio": 0.7,
+      "maxSignalVolRatio": 6.5,
+      "minCloseLocation": 0.45,
+      "minPlannedRr": 0.5,
+      "minAdx": 6,
+      "requireLtfBullishShift": true
+    },
+    "TREND": {
+      "enabled": false,
+      "allow15m": false,
+      "minScore": 55,
+      "minAdx": 12,
+      "rsiMin": 45,
+      "rsiMax": 58,
+      "requireSr": true,
+      "requireStackedEma": true,
+      "requireRsiFalling": false
+    },
+    "TREND_SHORT": {
+      "enabled": false,
+      "minScore": 76,
+      "minAdx": 20,
+      "rsiMin": 39,
+      "rsiMax": 52,
+      "requireSr": true,
+      "requireNearPullback": true,
+      "requireRsiFalling": true,
+      "maxPullbackPct": 0.025
+    },
+    "ENABLED": false
+  },
+  "LINKUSDC": {
+    "TF": "5m",
+    "HTF_TF": "1d",
+    "RSI_MIN": 35,
+    "RSI_MAX": 55,
+    "SL_ATR_MULT": 0.75,
+    "TP_ATR_MULT": 3,
+    "PULLBACK_BAND_ATR": 0.6,
+    "REQUIRE_SR": true,
+    "MIN_SPACE_TO_TARGET_ATR": 0.8,
+    "MAX_DISTANCE_FROM_SUPPORT_ATR": 1.2,
+    "TP_RESISTANCE_BUFFER_ATR": 0.15,
+    "REQUIRE_TREND": false,
+    "MIN_RR_PLANNED": 0.8,
+    "MIN_RR_AFTER_CAP": 0.03,
+    "TREND_REQUIRE_RSI_FALLING": true,
+    "BREAKDOWN_RETEST_SHORT": {
+      "enabled": false
+    },
+    "FAILED_BREAKDOWN": {
+      "enabled": false
+    },
+    "BULL_TRAP": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_SHORT": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_LONG": {
+      "enabled": true,
+      "minTpPct": 0.001,
+      "srHardBlockReasons": [
+        "resistance_too_close"
+      ]
+    },
+    "TREND": {
+      "enabled": false
+    },
+    "TREND_SHORT": {
+      "enabled": false
+    },
+    "ENABLED": true
+  },
+  "1000SHIBUSDC": {
+    "TF": "15m",
+    "HTF_TF": "1d",
+    "RSI_MIN": 35,
+    "RSI_MAX": 55,
+    "SL_ATR_MULT": 0.75,
+    "TP_ATR_MULT": 3,
+    "PULLBACK_BAND_ATR": 0.6,
+    "REQUIRE_SR": true,
+    "MIN_SPACE_TO_TARGET_ATR": 0.8,
+    "MAX_DISTANCE_FROM_SUPPORT_ATR": 1.2,
+    "TP_RESISTANCE_BUFFER_ATR": 0.15,
+    "REQUIRE_TREND": false,
+    "MIN_RR_PLANNED": 0.8,
+    "MIN_RR_AFTER_CAP": 0.03,
+    "TREND_REQUIRE_RSI_FALLING": true,
+    "OVERSOLD_BOUNCE": {
+      "enabled": false
+    },
+    "BREAKDOWN_RETEST_SHORT": {
+      "enabled": false
+    },
+    "FAILED_BREAKDOWN": {
+      "enabled": false
+    },
+    "BULL_TRAP": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_SHORT": {
+      "enabled": true,
+      "minScore": 96,
+      "minAdx": 12
+    },
+    "CIPHER_CONTINUATION_LONG": {
+      "enabled": false
+    },
+    "IGNITION_CONTINUATION_LONG": {
+      "enabled": false
+    },
+    "TREND": {
+      "enabled": false
+    },
+    "TREND_SHORT": {
+      "enabled": false
+    },
+    "ENABLED": true
+  },
+  "1000PEPEUSDC": {
+    "TF": "1h",
+    "HTF_TF": "1d",
+    "RSI_MIN": 35,
+    "RSI_MAX": 55,
+    "SL_ATR_MULT": 0.75,
+    "TP_ATR_MULT": 3,
+    "PULLBACK_BAND_ATR": 0.6,
+    "REQUIRE_SR": true,
+    "MIN_SPACE_TO_TARGET_ATR": 0.8,
+    "MAX_DISTANCE_FROM_SUPPORT_ATR": 1.2,
+    "TP_RESISTANCE_BUFFER_ATR": 0.15,
+    "REQUIRE_TREND": false,
+    "MIN_RR_PLANNED": 0.8,
+    "MIN_RR_AFTER_CAP": 0.03,
+    "TREND_REQUIRE_RSI_FALLING": true,
+    "OVERSOLD_BOUNCE": {
+      "enabled": false
+    },
+    "BREAKDOWN_RETEST_SHORT": {
+      "enabled": false
+    },
+    "FAILED_BREAKDOWN": {
+      "enabled": false
+    },
+    "BULL_TRAP": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_SHORT": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_LONG": {
+      "enabled": true
+    },
+    "IGNITION_CONTINUATION_LONG": {
+      "enabled": false
+    },
+    "TREND": {
+      "enabled": false
+    },
+    "TREND_SHORT": {
+      "enabled": false
+    },
+    "ENABLED": false
+  },
+  "QQQUSDT": {
+    "TF": "1h",
+    "HTF_TF": "1d",
+    "RSI_MIN": 35,
+    "RSI_MAX": 55,
+    "SL_ATR_MULT": 0.75,
+    "TP_ATR_MULT": 3,
+    "PULLBACK_BAND_ATR": 0.6,
+    "REQUIRE_SR": true,
+    "MIN_SPACE_TO_TARGET_ATR": 0.8,
+    "MAX_DISTANCE_FROM_SUPPORT_ATR": 1.2,
+    "TP_RESISTANCE_BUFFER_ATR": 0.15,
+    "REQUIRE_TREND": false,
+    "MIN_RR_PLANNED": 0.8,
+    "MIN_RR_AFTER_CAP": 0.03,
+    "TREND_REQUIRE_RSI_FALLING": true,
+    "OVERSOLD_BOUNCE": {
+      "enabled": true,
+      "minScore": 55,
+      "minAdx": 0,
+      "maxRsi": 50,
+      "minRsiRecovery": 0.5,
+      "minDropAtr": 0.8,
+      "minBullRecoveryBodyAtr": 0.06,
+      "minRelativeVolume": 0.9,
+      "requireVolume": false,
+      "slAtrMult": 1,
+      "tpAtrMult": 1.4,
+      "minRrAfterCap": 0.6,
+      "minTpPctAfterCap": 0.0007,
+      "minTpAtrAfterCap": 0.3
+    },
+    "BREAKDOWN_RETEST_SHORT": {
+      "enabled": false
+    },
+    "FAILED_BREAKDOWN": {
+      "enabled": false
+    },
+    "BULL_TRAP": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_SHORT": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_LONG": {
+      "enabled": false
+    },
+    "IGNITION_CONTINUATION_LONG": {
+      "enabled": false
+    },
+    "TREND": {
+      "enabled": false
+    },
+    "TREND_SHORT": {
+      "enabled": false
+    },
+    "ENABLED": false
+  },
+  "AAPLUSDT": {
+    "TF": "1h",
+    "HTF_TF": "1d",
+    "RSI_MIN": 35,
+    "RSI_MAX": 55,
+    "SL_ATR_MULT": 0.75,
+    "TP_ATR_MULT": 3,
+    "PULLBACK_BAND_ATR": 0.6,
+    "REQUIRE_SR": true,
+    "MIN_SPACE_TO_TARGET_ATR": 0.8,
+    "MAX_DISTANCE_FROM_SUPPORT_ATR": 1.2,
+    "TP_RESISTANCE_BUFFER_ATR": 0.15,
+    "REQUIRE_TREND": false,
+    "MIN_RR_PLANNED": 0.8,
+    "MIN_RR_AFTER_CAP": 0.03,
+    "TREND_REQUIRE_RSI_FALLING": true,
+    "OVERSOLD_BOUNCE": {
+      "enabled": true,
+      "minScore": 55,
+      "minAdx": 0,
+      "maxRsi": 50,
+      "minRsiRecovery": 0.5,
+      "minDropAtr": 0.8,
+      "minBullRecoveryBodyAtr": 0.06,
+      "minRelativeVolume": 0.9,
+      "requireVolume": false,
+      "slAtrMult": 1,
+      "tpAtrMult": 1.4,
+      "minRrAfterCap": 0.6,
+      "minTpPctAfterCap": 0.0007,
+      "minTpAtrAfterCap": 0.3
+    },
+    "BREAKDOWN_RETEST_SHORT": {
+      "enabled": false
+    },
+    "FAILED_BREAKDOWN": {
+      "enabled": false
+    },
+    "BULL_TRAP": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_SHORT": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_LONG": {
+      "enabled": false
+    },
+    "IGNITION_CONTINUATION_LONG": {
+      "enabled": false
+    },
+    "TREND": {
+      "enabled": false
+    },
+    "TREND_SHORT": {
+      "enabled": false
+    },
+    "ENABLED": false
+  },
+  "SPYUSDT": {
+    "TF": "1h",
+    "HTF_TF": "1d",
+    "RSI_MIN": 35,
+    "RSI_MAX": 55,
+    "SL_ATR_MULT": 0.75,
+    "TP_ATR_MULT": 3,
+    "PULLBACK_BAND_ATR": 0.6,
+    "REQUIRE_SR": true,
+    "MIN_SPACE_TO_TARGET_ATR": 0.8,
+    "MAX_DISTANCE_FROM_SUPPORT_ATR": 1.2,
+    "TP_RESISTANCE_BUFFER_ATR": 0.15,
+    "REQUIRE_TREND": false,
+    "MIN_RR_PLANNED": 0.8,
+    "MIN_RR_AFTER_CAP": 0.03,
+    "TREND_REQUIRE_RSI_FALLING": true,
+    "OVERSOLD_BOUNCE": {
+      "enabled": true,
+      "minScore": 55,
+      "minAdx": 0,
+      "maxRsi": 50,
+      "minRsiRecovery": 0.5,
+      "minDropAtr": 0.8,
+      "minBullRecoveryBodyAtr": 0.06,
+      "minRelativeVolume": 0.9,
+      "requireVolume": false,
+      "slAtrMult": 1,
+      "tpAtrMult": 1.4,
+      "minRrAfterCap": 0.6,
+      "minTpPctAfterCap": 0.0007,
+      "minTpAtrAfterCap": 0.3
+    },
+    "BREAKDOWN_RETEST_SHORT": {
+      "enabled": false
+    },
+    "FAILED_BREAKDOWN": {
+      "enabled": false
+    },
+    "BULL_TRAP": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_SHORT": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_LONG": {
+      "enabled": false
+    },
+    "IGNITION_CONTINUATION_LONG": {
+      "enabled": false
+    },
+    "TREND": {
+      "enabled": false
+    },
+    "TREND_SHORT": {
+      "enabled": false
+    },
+    "ENABLED": false
+  },
+  "AMZNUSDT": {
+    "TF": "1h",
+    "HTF_TF": "1d",
+    "RSI_MIN": 35,
+    "RSI_MAX": 55,
+    "SL_ATR_MULT": 0.75,
+    "TP_ATR_MULT": 3,
+    "PULLBACK_BAND_ATR": 0.6,
+    "REQUIRE_SR": true,
+    "MIN_SPACE_TO_TARGET_ATR": 0.8,
+    "MAX_DISTANCE_FROM_SUPPORT_ATR": 1.2,
+    "TP_RESISTANCE_BUFFER_ATR": 0.15,
+    "REQUIRE_TREND": false,
+    "MIN_RR_PLANNED": 0.8,
+    "MIN_RR_AFTER_CAP": 0.03,
+    "TREND_REQUIRE_RSI_FALLING": true,
+    "BREAKDOWN_RETEST_SHORT": {
+      "enabled": true
+    },
+    "FAILED_BREAKDOWN": {
+      "enabled": false
+    },
+    "BULL_TRAP": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_SHORT": {
+      "enabled": false
+    },
+    "CIPHER_CONTINUATION_LONG": {
+      "enabled": false
+    },
+    "IGNITION_CONTINUATION_LONG": {
+      "enabled": false
+    },
+    "TREND": {
+      "enabled": false
+    },
+    "TREND_SHORT": {
+      "enabled": false
+    },
+    "ENABLED": false
+  },
+  "DOGEUSDC": {
+    "RSI_MIN": 35,
+    "RSI_MAX": 55,
+    "SL_ATR_MULT": 0.75,
+    "TP_ATR_MULT": 3,
+    "PULLBACK_BAND_ATR": 0.6,
+    "REQUIRE_SR": true,
+    "MIN_SPACE_TO_TARGET_ATR": 0.8,
+    "MAX_DISTANCE_FROM_SUPPORT_ATR": 1.2,
+    "TP_RESISTANCE_BUFFER_ATR": 0.15,
+    "REQUIRE_TREND": false,
+    "MIN_RR_PLANNED": 0.8,
+    "MIN_RR_AFTER_CAP": 0.03,
+    "TREND_SHORT": {
+      "minScore": 80,
+      "minAdx": 22,
+      "rsiMin": 40,
+      "rsiMax": 52,
+      "requireSr": true,
+      "requireNearPullback": true,
+      "requireRsiFalling": true,
+      "maxPullbackPct": 0.02
+    },
+    "ENABLED": false
+  }
+}

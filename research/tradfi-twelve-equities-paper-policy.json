@@ -1,0 +1,130 @@
+{
+  "generatedAt": "2026-04-26T00:05:44.260Z",
+  "sourceSummaryFile": "/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/meta-models-tradfi/equities_reversal_1h_1d_core/oversold-bounce-combined-summary.json",
+  "profileLabel": "equities_reversal_1h_1d_core",
+  "strategy": "oversoldBounce",
+  "thresholds": {
+    "core": {
+      "minRows": 90,
+      "minTestF1": 0.55
+    },
+    "observe": {
+      "minRows": 80,
+      "minTestF1": 0.4
+    },
+    "minProbability": 0.55
+  },
+  "aggregateModel": {
+    "rows": 283,
+    "metricsValidation": {
+      "tp": 10,
+      "tn": 18,
+      "fp": 9,
+      "fn": 20,
+      "accuracy": 0.49122807017543857,
+      "precision": 0.5263157894736842,
+      "recall": 0.3333333333333333,
+      "f1": 0.4081632653061224
+    },
+    "metricsTest": {
+      "tp": 9,
+      "tn": 20,
+      "fp": 14,
+      "fn": 14,
+      "accuracy": 0.5087719298245614,
+      "precision": 0.391304347826087,
+      "recall": 0.391304347826087,
+      "f1": 0.391304347826087
+    },
+    "modelFile": "/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/meta-models-tradfi/equities_reversal_1h_1d_core/oversold-bounce-meta-model.json"
+  },
+  "symbols": {
+    "AAPLUSDT": {
+      "status": "core",
+      "reason": "symbol_model_beats_core_threshold",
+      "rows": 107,
+      "minProbability": 0.55,
+      "metricsValidation": {
+        "tp": 8,
+        "tn": 4,
+        "fp": 8,
+        "fn": 1,
+        "accuracy": 0.5714285714285714,
+        "precision": 0.5,
+        "recall": 0.8888888888888888,
+        "f1": 0.64
+      },
+      "metricsTest": {
+        "tp": 5,
+        "tn": 11,
+        "fp": 2,
+        "fn": 4,
+        "accuracy": 0.7272727272727273,
+        "precision": 0.7142857142857143,
+        "recall": 0.5555555555555556,
+        "f1": 0.6250000000000001
+      },
+      "modelFile": "/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/meta-models-tradfi/equities_reversal_1h_1d_core/by-symbol/aaplusdt/oversold-bounce-meta-model.json",
+      "fallbackModelFile": "/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/meta-models-tradfi/equities_reversal_1h_1d_core/oversold-bounce-meta-model.json",
+      "fallbackStatus": "available"
+    },
+    "QQQUSDT": {
+      "status": "observe",
+      "reason": "symbol_model_promising_but_not_core",
+      "rows": 83,
+      "minProbability": 0.55,
+      "metricsValidation": {
+        "tp": 4,
+        "tn": 4,
+        "fp": 5,
+        "fn": 4,
+        "accuracy": 0.47058823529411764,
+        "precision": 0.4444444444444444,
+        "recall": 0.5,
+        "f1": 0.47058823529411764
+      },
+      "metricsTest": {
+        "tp": 3,
+        "tn": 6,
+        "fp": 4,
+        "fn": 4,
+        "accuracy": 0.5294117647058824,
+        "precision": 0.42857142857142855,
+        "recall": 0.42857142857142855,
+        "f1": 0.42857142857142855
+      },
+      "modelFile": "/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/meta-models-tradfi/equities_reversal_1h_1d_core/by-symbol/qqqusdt/oversold-bounce-meta-model.json",
+      "fallbackModelFile": "/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/meta-models-tradfi/equities_reversal_1h_1d_core/oversold-bounce-meta-model.json",
+      "fallbackStatus": "available"
+    },
+    "SPYUSDT": {
+      "status": "core",
+      "reason": "symbol_model_beats_core_threshold",
+      "rows": 93,
+      "minProbability": 0.55,
+      "metricsValidation": {
+        "tp": 3,
+        "tn": 5,
+        "fp": 1,
+        "fn": 10,
+        "accuracy": 0.42105263157894735,
+        "precision": 0.75,
+        "recall": 0.23076923076923078,
+        "f1": 0.3529411764705882
+      },
+      "metricsTest": {
+        "tp": 7,
+        "tn": 4,
+        "fp": 7,
+        "fn": 1,
+        "accuracy": 0.5789473684210527,
+        "precision": 0.5,
+        "recall": 0.875,
+        "f1": 0.6363636363636364
+      },
+      "modelFile": "/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/meta-models-tradfi/equities_reversal_1h_1d_core/by-symbol/spyusdt/oversold-bounce-meta-model.json",
+      "fallbackModelFile": "/Users/joel/Documents/CoddingStuff/TorusAiTrading/research/meta-models-tradfi/equities_reversal_1h_1d_core/oversold-bounce-meta-model.json",
+      "fallbackStatus": "available"
+    }
+  }
+}

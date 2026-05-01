@@ -1,0 +1,12 @@
+[Unit]
+Description=Run TorusAiTrading narrow strategy hunt hourly
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=1h
+RandomizedDelaySec=7min
+Persistent=true
+Unit=torus-ai-trading-strategy-hunt.service
+
+[Install]
+WantedBy=timers.target

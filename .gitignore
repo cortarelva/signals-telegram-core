@@ -1,5 +1,56 @@
-node_modules
+# Secrets and local environment
 .env
-state.json
-backtest-dataset.json
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# OS / editor noise
+.DS_Store
+.playwright-cli/
+
+# Process and log files
+*.pid
 *.log
+logs/
+
+# Local work artifacts
+output/
+archive/
+files_novos/
+
+# Accidental secret-bearing or local binary files
+BINANCE_API_KEY=*.pdf
+
+# Runtime state and local storage
+runtime/.bot-pids.json
+runtime/adaptive-history.json
+runtime/execution-metrics.json
+runtime/orders-log.json
+runtime/performance-baseline.json
+runtime/runtime-store.sqlite
+runtime/runtime-store.sqlite-shm
+runtime/runtime-store.sqlite-wal
+runtime/runtime-store.sqlite*
+runtime/state*.json
+runtime/trade-flow-watchdog-state.json
+runtime/trade-flow-watchdog.pid
+runtime/strategy-config.generated.json
+runtime/strategy-config.trade-flow-backup.json
+runtime/bot-live.log
+runtime/versao-estavel/
+
+# Research outputs and generated datasets
+research/cache/
+research/meta-models/
+research/meta-models-tradfi/
+research/*.csv
+research/*.json
+research/*-sweep/
+research/*-sweeps/
+!research/tradfi-twelve-equities-config.json
+!research/tradfi-twelve-equities-paper-policy.json
+
+# Misc local backups
+*.bak
